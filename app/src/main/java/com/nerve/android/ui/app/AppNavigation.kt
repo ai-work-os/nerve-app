@@ -4,6 +4,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.nerve.android.domain.server.ServerNode
+import com.nerve.android.transport.ServerConfig
 
 sealed interface AppScreen {
     data object Main : AppScreen
@@ -46,5 +48,17 @@ class AppNavigation {
 
     fun dismissError() {
         transientError = null
+    }
+
+    fun guardChat(servers: List<ServerConfig>, nodes: List<ServerNode>) {
+        val current = screen
+        if (current !is AppScreen.Chat) return
+        if (nodes.isEmpty()) return
+        val serverExists = servers.any { it.id == current.serverId }
+        val nodeExists = nodes.any { it.serverId == current.serverId && it.node.id == current.nodeId }
+        if (!serverExists || !nodeExists) {
+            back()
+            showError("Current chat target is unavailable")
+        }
     }
 }

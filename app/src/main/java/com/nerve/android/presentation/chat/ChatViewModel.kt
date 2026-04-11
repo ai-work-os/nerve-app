@@ -3,6 +3,8 @@ package com.nerve.android.presentation.chat
 import androidx.lifecycle.ViewModel
 import com.nerve.android.domain.dm.DmEventProcessor
 import com.nerve.android.domain.dm.DmKey
+import com.nerve.android.domain.dm.DmMessage
+import com.nerve.android.domain.dm.DmRole
 import com.nerve.android.domain.dm.DmStore
 import com.nerve.android.domain.server.ServerRegistry
 import com.nerve.android.transport.NerveEvent
@@ -20,8 +22,11 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 
 class ChatViewModel(
     private val dmStore: DmStore,
@@ -80,6 +85,9 @@ class ChatViewModel(
                     .map { it.event },
             )
         }
+        scope.launch {
+            loadSessionHistory(serverId, nodeId, nodeName)
+        }
         streamingJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
             serverRegistry.events
                 .filter { it.serverId == serverId }
@@ -93,7 +101,7 @@ class ChatViewModel(
                                 ?.jsonPrimitive
                                 ?.content
                             when (updateKind) {
-                                "agent_message_start", "agent_message_chunk" -> setStreaming(key.value, true)
+                                "agent_message_start", "agent_message_chunk", "agent_thought_chunk" -> setStreaming(key.value, true)
                                 "agent_message_end" -> setStreaming(key.value, false)
                             }
                         }
@@ -133,15 +141,49 @@ class ChatViewModel(
         if (text.isBlank()) return
         val serverId = currentServerId ?: return
         val nodeId = currentNodeId ?: return
-        val key = "$serverId:$nodeId"
-        Logger.d("ChatViewModel", "chat send key=$key len=${text.length}")
+        val dmKey = DmKey("$serverId:$nodeId")
+        val nodeName = _uiState.value.nodeName ?: nodeId
+        Logger.d("ChatViewModel", "chat send key=${dmKey.value} len=${text.length}")
         _uiState.value = _uiState.value.copy(isSending = true, errorMessage = null)
+        val userMessage = DmMessage(
+            id = "local-${System.currentTimeMillis()}",
+            role = DmRole.USER,
+            content = text,
+            timestamp = System.currentTimeMillis(),
+            nodeId = nodeId,
+            nodeName = nodeName,
+        )
+        dmStore.appendMessage(dmKey, userMessage)
         runCatching {
             serverRegistry.client(serverId)?.prompt(nodeId, text)
         }.onFailure {
             _uiState.value = _uiState.value.copy(errorMessage = it.message)
         }
         _uiState.value = _uiState.value.copy(isSending = false)
+    }
+
+    private suspend fun loadSessionHistory(serverId: String, nodeId: String, nodeName: String) {
+        val client = serverRegistry.client(serverId) ?: return
+        runCatching {
+            val listResult = client.call(
+                "session.list",
+                buildJsonObject { put("nodeName", nodeName) },
+            )
+            val sessions = listResult.jsonObject["sessions"] as? JsonArray ?: return
+            if (sessions.isEmpty()) return
+            val latestSessionId = sessions.last()
+                .jsonObject["sessionId"]?.jsonPrimitive?.content ?: return
+            Logger.d("ChatViewModel", "chat session.load key=$serverId:$nodeId sessionId=$latestSessionId")
+            client.call(
+                "session.load",
+                buildJsonObject {
+                    put("nodeName", nodeName)
+                    put("sessionId", latestSessionId)
+                },
+            )
+        }.onFailure {
+            Logger.w("ChatViewModel", "chat session load failed key=$serverId:$nodeId reason=${it.message}")
+        }
     }
 
     private fun setStreaming(key: String, enabled: Boolean) {

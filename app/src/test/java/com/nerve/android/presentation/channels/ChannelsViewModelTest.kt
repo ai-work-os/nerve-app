@@ -56,10 +56,12 @@ class ChannelsViewModelTest {
 
         vm.joinChannel("s1", "c1")
         vm.sendMessage("ping")
-        assertEquals("channel.join", client.rpcCalls[0].first)
-        assertEquals("c1", client.rpcCalls[0].second["channelId"]!!.jsonPrimitive.content)
-        assertEquals("channel.post", client.rpcCalls[1].first)
-        assertEquals("ping", client.rpcCalls[1].second["content"]!!.jsonPrimitive.content)
+        val joinCalls = client.rpcCalls.filter { it.first == "channel.join" }
+        val postCalls = client.rpcCalls.filter { it.first == "channel.post" }
+        assertEquals(1, joinCalls.size)
+        assertEquals("c1", joinCalls[0].second["channelId"]!!.jsonPrimitive.content)
+        assertEquals(1, postCalls.size)
+        assertEquals("ping", postCalls[0].second["content"]!!.jsonPrimitive.content)
 
         registry.events.emit(ServerScopedEvent("s1", NerveEvent.ChannelCreated("c3", "new")))
         registry.events.emit(ServerScopedEvent("s1", NerveEvent.ChannelClosed("c1", "general")))
@@ -92,6 +94,24 @@ class ChannelsViewModelTest {
         assertEquals(false, vm.uiState.value.currentMeta?.isClosed)
         assertEquals(listOf("s1"), processor.cancelledCalls)
         assertEquals(emptyList<String?>(), registry.refreshCalls)
+    }
+
+    @Test
+    fun `enterChannel calls channel history to load messages`() = runTest {
+        val store = InMemoryChannelStore()
+        val processor = FakeChannelEventProcessor()
+        val registry = FakeServerRegistry()
+        val client = FakeNerveClient()
+        registry.clients["s1"] = client
+        val vm = ChannelsViewModel(store, processor, registry, Dispatchers.Unconfined)
+
+        vm.enterChannel("s1", "c1", "general")
+
+        val historyCalls = client.rpcCalls.filter { it.first == "channel.history" }
+        assertEquals(1, historyCalls.size,
+            "Expected enterChannel to call channel.history RPC, but rpcCalls were: ${client.rpcCalls.map { it.first }}")
+        assertEquals("c1", historyCalls[0].second["channelId"]!!.jsonPrimitive.content,
+            "channel.history should be called with the correct channelId")
     }
 
     private fun clearViewModel(viewModel: ViewModel) {

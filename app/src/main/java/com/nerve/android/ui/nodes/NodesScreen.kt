@@ -4,25 +4,38 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,12 +43,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.nerve.android.presentation.nodes.NodeItemUi
 import com.nerve.android.presentation.nodes.NodesUiState
 import com.nerve.android.transport.ServerConfig
+import com.nerve.android.ui.theme.StatusError
+import com.nerve.android.ui.theme.StatusIdle
+import com.nerve.android.ui.theme.statusColor
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NodesScreen(
     state: NodesUiState,
@@ -57,64 +77,87 @@ fun NodesScreen(
         }
     }
 
-    Column(
-        modifier = Modifier.padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        // Top bar: title + badge + actions
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("Agents", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-            if (state.totalCount > 0) {
-                Text(
-                    "${state.connectedCount}/${state.totalCount}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (state.connectedCount == state.totalCount)
-                        MaterialTheme.colorScheme.primary
-                    else
-                        MaterialTheme.colorScheme.error,
-                )
-            }
-            Button(onClick = { setShowSpawn(true) }) { Text("+") }
-            Button(onClick = onRefresh, enabled = !state.isRefreshing) { Text("Refresh") }
-        }
-
-        state.errorMessage?.let {
-            Text(it, color = MaterialTheme.colorScheme.error)
-        }
-
-        if (state.items.isEmpty()) {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(top = 32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text("No agents", style = MaterialTheme.typography.bodyLarge)
-                Text("Tap + to spawn one", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        } else {
-            val grouped = state.items
-                .sortedWith(compareBy<NodeItemUi> { it.serverName }.thenBy { it.nodeName })
-                .groupBy { it.serverName }
-
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                grouped.forEach { (serverName, nodes) ->
-                    item(key = "header:$serverName") {
-                        Text(
-                            text = serverName.uppercase(),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
-                        )
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Agents", fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.width(8.dp))
+                        if (state.totalCount > 0) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (state.connectedCount > 0) StatusIdle.copy(alpha = 0.15f) else StatusError.copy(alpha = 0.15f),
+                            ) {
+                                Text(
+                                    "${state.connectedCount}/${state.totalCount}",
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    color = if (state.connectedCount > 0) StatusIdle else StatusError,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
+                        }
                     }
-                    items(items = nodes, key = { "${it.serverId}:${it.nodeId}" }) { item ->
-                        NodeRow(
-                            item = item,
-                            onOpenChat = onOpenChat,
-                            onStop = onStop,
-                        )
+                },
+                actions = {
+                    IconButton(onClick = { setShowSpawn(true) }) {
+                        Icon(Icons.Default.Add, contentDescription = "Spawn agent")
+                    }
+                    IconButton(onClick = onRefresh, enabled = !state.isRefreshing) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                    actionIconContentColor = MaterialTheme.colorScheme.onSurface,
+                ),
+            )
+        },
+    ) { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            state.errorMessage?.let {
+                Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            }
+
+            if (state.items.isEmpty()) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Text("No agents", style = MaterialTheme.typography.bodyLarge)
+                    Text("Tap + to spawn one", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            } else {
+                val grouped = state.items
+                    .sortedWith(compareBy<NodeItemUi> { it.serverName }.thenBy { it.nodeName })
+                    .groupBy { it.serverName }
+
+                LazyColumn {
+                    grouped.forEach { (serverName, nodes) ->
+                        item(key = "header:$serverName") {
+                            Text(
+                                text = serverName.uppercase(),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                letterSpacing = 1.sp,
+                                modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp),
+                            )
+                        }
+                        items(items = nodes, key = { "${it.serverId}:${it.nodeId}" }) { item ->
+                            NodeRow(
+                                item = item,
+                                onOpenChat = onOpenChat,
+                                onStop = onStop,
+                            )
+                            HorizontalDivider(
+                                color = MaterialTheme.colorScheme.outline,
+                                thickness = 0.5.dp,
+                                modifier = Modifier.padding(start = 38.dp),
+                            )
+                        }
                     }
                 }
             }
@@ -136,11 +179,30 @@ private fun NodeRow(
     onOpenChat: (String, String, String) -> Unit,
     onStop: (String, String) -> Unit,
 ) {
+    var showStopConfirm by remember { mutableStateOf(false) }
+
+    if (showStopConfirm) {
+        AlertDialog(
+            onDismissRequest = { showStopConfirm = false },
+            title = { Text("停止节点") },
+            text = { Text("确定要停止 ${item.nodeName} 吗？") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showStopConfirm = false
+                    onStop(item.serverId, item.nodeId)
+                }) { Text("停止", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showStopConfirm = false }) { Text("取消") }
+            },
+        )
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onOpenChat(item.serverId, item.nodeId, item.nodeName) }
-            .padding(vertical = 8.dp, horizontal = 4.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -153,16 +215,23 @@ private fun NodeRow(
 
         // Name + subtitle
         Column(modifier = Modifier.weight(1f)) {
-            Text(item.nodeName, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                item.nodeName,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 15.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     item.status,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = statusColor(item.status),
                 )
                 item.cwdLabel?.let {
                     Text(
-                        "· $it",
+                        " · $it",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -170,10 +239,18 @@ private fun NodeRow(
             }
         }
 
-        // Stop button (only if not already stopped)
+        // Stop button
         if (item.status != "stopped") {
-            IconButton(onClick = { onStop(item.serverId, item.nodeId) }) {
-                Text("×", style = MaterialTheme.typography.titleMedium)
+            IconButton(
+                onClick = { showStopConfirm = true },
+                modifier = Modifier.size(32.dp),
+            ) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = "Stop ${item.nodeName}",
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(16.dp),
+                )
             }
         }
 
@@ -181,17 +258,10 @@ private fun NodeRow(
         Text(
             item.shortId,
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontFamily = FontFamily.Monospace,
+            color = MaterialTheme.colorScheme.outline,
         )
     }
-}
-
-private fun statusColor(status: String): Color = when (status) {
-    "idle" -> Color(0xFF4CAF50)
-    "busy" -> Color(0xFFFFC107)
-    "error" -> Color(0xFFF44336)
-    "stopped" -> Color(0xFF9E9E9E)
-    else -> Color(0xFF9E9E9E)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

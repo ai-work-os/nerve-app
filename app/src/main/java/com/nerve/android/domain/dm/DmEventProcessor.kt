@@ -2,7 +2,6 @@ package com.nerve.android.domain.dm
 
 import com.nerve.android.transport.NerveEvent
 import com.nerve.android.util.Logger
-import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collect
 
@@ -15,20 +14,14 @@ class DefaultDmEventProcessor(
     private val mapper: DmEventMapper = DmEventMapper(),
     private val accumulator: StreamingAccumulator = InMemoryStreamingAccumulator(),
 ) : DmEventProcessor {
-    private val activeKeys = ConcurrentHashMap.newKeySet<DmKey>()
-
     override suspend fun attach(serverId: String, nodeId: String, events: Flow<NerveEvent>) {
         val key = DmKey("$serverId:$nodeId")
-        if (!activeKeys.add(key)) {
-            Logger.w("DmEventProcessor", "dm ignore key=${key.value} reason=duplicate_attach")
-            return
-        }
-        try {
-            events.collect { event ->
+        events.collect { event ->
+            try {
                 handleEvent(key, nodeId, event)
+            } catch (e: Exception) {
+                Logger.e("DmEventProcessor", "dm event error key=${key.value}", e)
             }
-        } finally {
-            activeKeys.remove(key)
         }
     }
 
@@ -74,6 +67,24 @@ class DefaultDmEventProcessor(
             is DmMappedEvent.NodeIdle -> {
                 Logger.d("DmEventProcessor", "dm event key=${key.value} kind=node_idle")
                 accumulator.flush(key, mapped.timestamp, FlushReason.NODE_IDLE)?.let { store.appendMessage(key, it) }
+            }
+
+            is DmMappedEvent.AgentThoughtChunk -> {
+                Logger.d("DmEventProcessor", "dm event key=${key.value} kind=agent_thought_chunk")
+                accumulator.onThoughtChunk(key, mapped.text, mapped.timestamp)
+            }
+
+            is DmMappedEvent.AgentThoughtEnd -> {
+                Logger.d("DmEventProcessor", "dm event key=${key.value} kind=agent_thought_end")
+            }
+
+            is DmMappedEvent.ToolCall -> {
+                Logger.d("DmEventProcessor", "dm event key=${key.value} kind=tool_call tool=${mapped.toolName}")
+                accumulator.onToolCall(key, mapped.toolId, mapped.toolName, mapped.input, mapped.timestamp)
+            }
+
+            is DmMappedEvent.ToolCallUpdate -> {
+                Logger.d("DmEventProcessor", "dm event key=${key.value} kind=tool_call_update status=${mapped.status}")
             }
 
             DmMappedEvent.Ignore -> Unit

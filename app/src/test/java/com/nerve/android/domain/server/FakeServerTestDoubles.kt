@@ -40,6 +40,7 @@ class FakeNerveClient : NerveClient {
     var listNodesCalls = 0
     var listChannelsCalls = 0
     var callResult: Result<JsonElement> = Result.success(buildJsonObject {})
+    val callResults: MutableMap<String, Result<JsonElement>> = mutableMapOf()
     var promptResult: Result<PromptResult> = Result.success(PromptResult(stopReason = "stop"))
     var spawnResult: Result<SpawnResult> = Result.success(SpawnResult(nodeId = "n1"))
     var stopResult: Result<Unit> = Result.success(Unit)
@@ -59,7 +60,7 @@ class FakeNerveClient : NerveClient {
 
     override suspend fun call(method: String, params: JsonObject): JsonElement {
         rpcCalls += method to params
-        return callResult.getOrThrow()
+        return (callResults[method] ?: callResult).getOrThrow()
     }
 
     override suspend fun listNodes(): List<NodeInfo> {

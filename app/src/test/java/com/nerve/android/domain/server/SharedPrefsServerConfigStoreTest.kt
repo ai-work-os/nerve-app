@@ -7,14 +7,17 @@ import kotlin.test.assertEquals
 
 class SharedPrefsServerConfigStoreTest {
     @Test
-    fun `first load injects default server and persists it`() = runTest {
+    fun `first load injects default servers and persists them`() = runTest {
         val prefs = InMemorySharedPreferences()
         val store = SharedPrefsServerConfigStore(prefs)
 
         val configs = store.load()
 
         assertEquals(
-            listOf(ServerConfig(id = "local", name = "Local", address = "127.0.0.1:4800")),
+            listOf(
+                ServerConfig(id = "mac", name = "Mac", address = "100.109.126.37:4800"),
+                ServerConfig(id = "home", name = "Home Server", address = "100.75.43.90:4800"),
+            ),
             configs,
         )
         assertEquals(configs, SharedPrefsServerConfigStore(prefs).load())
@@ -25,12 +28,18 @@ class SharedPrefsServerConfigStoreTest {
         val prefs = InMemorySharedPreferences()
         val store = SharedPrefsServerConfigStore(prefs)
 
-        store.upsert(ServerConfig(id = "home", name = "Home", address = "10.0.0.1:4800"))
-        store.upsert(ServerConfig(id = "home", name = "Home 2", address = "10.0.0.2:4800"))
-        store.remove("local")
+        store.upsert(ServerConfig(id = "office", name = "Office", address = "10.0.0.1:4800"))
+        store.upsert(ServerConfig(id = "office", name = "Office 2", address = "10.0.0.2:4800"))
+        store.remove("mac")
 
         val reloaded = SharedPrefsServerConfigStore(prefs).load()
-        assertEquals(listOf(ServerConfig(id = "home", name = "Home 2", address = "10.0.0.2:4800")), reloaded)
+        assertEquals(
+            listOf(
+                ServerConfig(id = "home", name = "Home Server", address = "100.75.43.90:4800"),
+                ServerConfig(id = "office", name = "Office 2", address = "10.0.0.2:4800"),
+            ),
+            reloaded,
+        )
     }
 
     @Test
@@ -40,6 +49,12 @@ class SharedPrefsServerConfigStoreTest {
 
         val configs = SharedPrefsServerConfigStore(prefs).load()
 
-        assertEquals(listOf(ServerConfig(id = "local", name = "Local", address = "127.0.0.1:4800")), configs)
+        assertEquals(
+            listOf(
+                ServerConfig(id = "mac", name = "Mac", address = "100.109.126.37:4800"),
+                ServerConfig(id = "home", name = "Home Server", address = "100.75.43.90:4800"),
+            ),
+            configs,
+        )
     }
 }

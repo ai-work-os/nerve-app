@@ -4,8 +4,10 @@ import com.nerve.android.transport.NerveEvent
 import com.nerve.android.util.Logger
 import java.security.MessageDigest
 import java.time.Instant
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -66,8 +68,93 @@ class DmEventMapper {
                 fallbackText = text,
             )
 
+            "agent_thought_chunk" -> {
+                if (text.isNullOrEmpty()) return ignore(event.nodeId, "empty_thought")
+                DmMappedEvent.AgentThoughtChunk(
+                    nodeId = event.nodeId,
+                    text = text,
+                    timestamp = timestamp,
+                )
+            }
+
+            "agent_thought_end" -> DmMappedEvent.AgentThoughtEnd(
+                nodeId = event.nodeId,
+                timestamp = timestamp,
+            )
+
+            "tool_call" -> mapToolCall(update, event.nodeId, timestamp)
+
+            "tool_call_update" -> mapToolCallUpdate(update, event.nodeId, timestamp)
+
             else -> ignore(event.nodeId, "unknown_update")
         }
+    }
+
+    private fun mapToolCall(update: JsonObject, nodeId: String, timestamp: Long): DmMappedEvent {
+        // ACP flat format: toolCallId, _meta.claudeCode.toolName, rawInput
+        val acpId = update["toolCallId"]?.jsonPrimitive?.content
+        if (acpId != null) {
+            val toolName = update["_meta"]?.jsonObject
+                ?.get("claudeCode")?.jsonObject
+                ?.get("toolName")?.jsonPrimitive?.content
+                ?: update["title"]?.jsonPrimitive?.content
+                ?: ""
+            val input = update["rawInput"]?.jsonPrimitive?.content ?: ""
+            return DmMappedEvent.ToolCall(nodeId = nodeId, toolId = acpId, toolName = toolName, input = input, timestamp = timestamp)
+        }
+        // Legacy nested format: toolCall.{id, name, input}
+        val legacy = update["toolCall"] as? JsonObject
+        if (legacy != null) {
+            return DmMappedEvent.ToolCall(
+                nodeId = nodeId,
+                toolId = legacy["id"]?.jsonPrimitive?.content ?: "",
+                toolName = legacy["name"]?.jsonPrimitive?.content ?: "",
+                input = legacy["input"]?.toString() ?: "",
+                timestamp = timestamp,
+            )
+        }
+        // Original content-based format
+        val content = update["content"] as? JsonObject ?: return ignore(nodeId, "missing_tool_call")
+        return DmMappedEvent.ToolCall(
+            nodeId = nodeId,
+            toolId = content["id"]?.jsonPrimitive?.content ?: "",
+            toolName = content["name"]?.jsonPrimitive?.content ?: "",
+            input = content["input"]?.toString() ?: "",
+            timestamp = timestamp,
+        )
+    }
+
+    private fun mapToolCallUpdate(update: JsonObject, nodeId: String, timestamp: Long): DmMappedEvent {
+        // ACP flat format: toolCallId, status, content array
+        val acpId = update["toolCallId"]?.jsonPrimitive?.content
+        if (acpId != null) {
+            val status = update["status"]?.jsonPrimitive?.content ?: ""
+            val output = (update["content"] as? JsonArray)?.mapNotNull { element ->
+                val obj = element as? JsonObject ?: return@mapNotNull null
+                (obj["content"] as? JsonObject)?.get("text")?.jsonPrimitive?.content
+            }?.joinToString("")?.ifEmpty { null }
+            return DmMappedEvent.ToolCallUpdate(nodeId = nodeId, toolId = acpId, status = status, output = output, timestamp = timestamp)
+        }
+        // Legacy nested format: toolCallUpdate.{id, status, content}
+        val legacy = update["toolCallUpdate"] as? JsonObject
+        if (legacy != null) {
+            return DmMappedEvent.ToolCallUpdate(
+                nodeId = nodeId,
+                toolId = legacy["id"]?.jsonPrimitive?.content ?: "",
+                status = legacy["status"]?.jsonPrimitive?.content ?: "",
+                output = legacy["content"]?.jsonPrimitive?.content,
+                timestamp = timestamp,
+            )
+        }
+        // Original content-based format
+        val content = update["content"] as? JsonObject ?: return ignore(nodeId, "missing_tool_update")
+        return DmMappedEvent.ToolCallUpdate(
+            nodeId = nodeId,
+            toolId = content["id"]?.jsonPrimitive?.content ?: "",
+            status = content["status"]?.jsonPrimitive?.content ?: "",
+            output = content["output"]?.jsonPrimitive?.content,
+            timestamp = timestamp,
+        )
     }
 
     private fun ignore(nodeId: String, reason: String): DmMappedEvent.Ignore {
@@ -104,6 +191,13 @@ private fun JsonObject.extractText(): String? {
     val content = this["content"] ?: return null
     return when (content) {
         is JsonObject -> content["text"]?.jsonPrimitive?.content
-        else -> content.jsonPrimitive.content
+        is kotlinx.serialization.json.JsonArray -> {
+            content.mapNotNull { element ->
+                val obj = element as? JsonObject ?: return@mapNotNull null
+                val type = obj["type"]?.jsonPrimitive?.content
+                if (type == "text") obj["text"]?.jsonPrimitive?.content else null
+            }.joinToString("").ifEmpty { null }
+        }
+        else -> runCatching { content.jsonPrimitive.content }.getOrNull()
     }
 }

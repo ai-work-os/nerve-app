@@ -3,6 +3,7 @@ package com.nerve.android.presentation.channels
 import androidx.lifecycle.ViewModel
 import com.nerve.android.domain.channel.ChannelEventProcessor
 import com.nerve.android.domain.channel.ChannelKey
+import com.nerve.android.domain.channel.ChannelMessage
 import com.nerve.android.domain.channel.ChannelStore
 import com.nerve.android.domain.server.ServerRegistry
 import com.nerve.android.transport.NerveEvent
@@ -20,7 +21,11 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.long
 import kotlinx.serialization.json.put
 
 class ChannelsViewModel(
@@ -74,6 +79,9 @@ class ChannelsViewModel(
                 _uiState.value = _uiState.value.copy(currentMeta = meta)
             }
         }
+        scope.launch {
+            loadChannelHistory(serverId, channelId, key)
+        }
     }
 
     suspend fun joinChannel(serverId: String, channelId: String) {
@@ -109,6 +117,31 @@ class ChannelsViewModel(
             _uiState.value = _uiState.value.copy(errorMessage = it.message)
         }
         _uiState.value = _uiState.value.copy(isPosting = false)
+    }
+
+    private suspend fun loadChannelHistory(serverId: String, channelId: String, key: ChannelKey) {
+        val client = serverRegistry.client(serverId) ?: return
+        runCatching {
+            val result = client.call(
+                "channel.history",
+                buildJsonObject { put("channelId", channelId) },
+            )
+            val messages = result.jsonObject["messages"] as? JsonArray ?: return
+            for (element in messages) {
+                val obj = element.jsonObject
+                val msg = ChannelMessage(
+                    id = obj["id"]?.jsonPrimitive?.content ?: continue,
+                    channelId = channelId,
+                    from = obj["from"]?.jsonPrimitive?.content ?: "",
+                    content = obj["content"]?.jsonPrimitive?.content ?: "",
+                    timestamp = obj["timestamp"]?.jsonPrimitive?.long ?: 0L,
+                )
+                channelStore.appendMessage(key, msg)
+            }
+            Logger.d("ChannelsViewModel", "channels history key=${key.value} count=${messages.size}")
+        }.onFailure {
+            Logger.w("ChannelsViewModel", "channels history failed key=${key.value} reason=${it.message}")
+        }
     }
 
     private fun ensureAttached(serverId: String) {

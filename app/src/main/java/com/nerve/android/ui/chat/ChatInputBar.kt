@@ -4,7 +4,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -48,8 +51,9 @@ fun ChatInputBar(
                 },
             ),
         )
-        Button(
+        IconButton(
             onClick = {
+                if (!enabled) return@IconButton
                 val value = text
                 text = ""
                 onSend(value)
@@ -57,7 +61,7 @@ fun ChatInputBar(
             enabled = enabled,
             modifier = Modifier.padding(vertical = 12.dp),
         ) {
-            Text("Send")
+            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
         }
     }
 }

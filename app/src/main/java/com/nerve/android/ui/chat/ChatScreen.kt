@@ -15,6 +15,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.nerve.android.domain.dm.ContentBlock
 import com.nerve.android.presentation.chat.ChatUiState
 import com.nerve.android.util.Logger
 
@@ -22,6 +23,7 @@ import com.nerve.android.util.Logger
 fun ChatScreen(
     state: ChatUiState,
     streamingText: String,
+    streamingBlocks: List<ContentBlock> = emptyList(),
     canSend: Boolean = true,
     onSend: (String) -> Unit,
     onCancel: () -> Unit,
@@ -60,6 +62,7 @@ fun ChatScreen(
                     messages = state.messages,
                     isStreaming = state.isStreaming,
                     streamingText = streamingText,
+                    streamingBlocks = streamingBlocks,
                 )
             }
             HorizontalDivider()

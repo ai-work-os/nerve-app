@@ -1,5 +1,8 @@
 package com.nerve.android.ui.app
 
+import com.nerve.android.domain.server.ServerNode
+import com.nerve.android.transport.ServerConfig
+import com.nerve.android.transport.model.NodeInfo
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -80,6 +83,32 @@ class AppNavigationTest {
         val nav = AppNavigation()
         nav.back()
         assertIs<AppScreen.Main>(nav.screen)
+    }
+
+    @Test
+    fun `guardChat does not navigate back when nodes list is empty`() {
+        val nav = AppNavigation()
+        nav.openChat("s1", "n1", "bot")
+        val servers = listOf(ServerConfig("s1", "Home", "10.0.0.1:4800"))
+        val nodes = emptyList<ServerNode>()
+
+        nav.guardChat(servers, nodes)
+
+        assertIs<AppScreen.Chat>(nav.screen)
+        assertNull(nav.transientError)
+    }
+
+    @Test
+    fun `guardChat navigates back when nodes loaded but target node missing`() {
+        val nav = AppNavigation()
+        nav.openChat("s1", "n1", "bot")
+        val servers = listOf(ServerConfig("s1", "Home", "10.0.0.1:4800"))
+        val nodes = listOf(ServerNode("s1", "Home", NodeInfo("n2", "other-bot")))
+
+        nav.guardChat(servers, nodes)
+
+        assertIs<AppScreen.Main>(nav.screen)
+        assertEquals("Current chat target is unavailable", nav.transientError)
     }
 
     @Test

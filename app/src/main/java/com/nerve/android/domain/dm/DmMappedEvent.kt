@@ -34,5 +34,32 @@ sealed interface DmMappedEvent {
         val timestamp: Long,
     ) : DmMappedEvent
 
+    data class AgentThoughtChunk(
+        val nodeId: String,
+        val text: String,
+        val timestamp: Long,
+    ) : DmMappedEvent
+
+    data class AgentThoughtEnd(
+        val nodeId: String,
+        val timestamp: Long,
+    ) : DmMappedEvent
+
+    data class ToolCall(
+        val nodeId: String,
+        val toolId: String,
+        val toolName: String,
+        val input: String,
+        val timestamp: Long,
+    ) : DmMappedEvent
+
+    data class ToolCallUpdate(
+        val nodeId: String,
+        val toolId: String,
+        val status: String,
+        val output: String?,
+        val timestamp: Long,
+    ) : DmMappedEvent
+
     data object Ignore : DmMappedEvent
 }

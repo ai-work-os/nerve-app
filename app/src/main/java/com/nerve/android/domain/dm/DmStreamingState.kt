@@ -7,4 +7,5 @@ data class DmStreamingState(
     val startedAt: Long,
     var lastEventAt: Long,
     val text: StringBuilder = StringBuilder(),
+    val blocks: MutableList<ContentBlock> = mutableListOf(),
 )

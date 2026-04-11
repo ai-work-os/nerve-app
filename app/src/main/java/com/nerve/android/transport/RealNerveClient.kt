@@ -54,10 +54,16 @@ class ExponentialBackoffStrategy : BackoffStrategy {
 
 class RealNerveClient(
     private val endpoint: String? = null,
-    private val requestTimeoutMs: Long = 10_000,
+    private val requestTimeoutMs: Long = 120_000,
     private val backoffStrategy: BackoffStrategy = ExponentialBackoffStrategy(),
-    private val okHttpClient: OkHttpClient = OkHttpClient(),
+    private val okHttpClient: OkHttpClient = OkHttpClient.Builder()
+        .readTimeout(0, java.util.concurrent.TimeUnit.MILLISECONDS)
+        .pingInterval(15, java.util.concurrent.TimeUnit.SECONDS)
+        .build(),
 ) : NerveClient {
+    internal val httpClient: OkHttpClient get() = okHttpClient
+    internal val configuredRequestTimeoutMs: Long get() = requestTimeoutMs
+
     private val state = MutableStateFlow(ConnectionState.DISCONNECTED)
     private val eventFlow = MutableSharedFlow<NerveEvent>(extraBufferCapacity = 32)
     private val nextRequestId = AtomicLong(1)
@@ -240,7 +246,7 @@ class RealNerveClient(
             override fun send(text: String): Boolean = realSocket.send(text)
             override fun close(code: Int, reason: String): Boolean = realSocket.close(code, reason)
         }
-        opened.await()
+        withTimeout(okHttpClient.connectTimeoutMillis.toLong()) { opened.await() }
     }
 
     private fun handleIncoming(text: String) {

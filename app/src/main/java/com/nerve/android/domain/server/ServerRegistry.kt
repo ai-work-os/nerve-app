@@ -66,10 +66,13 @@ class RealServerRegistry(
         this.registration = registration
         val configs = configStore.load()
         _servers.value = configs
-        for (config in configs) {
-            runCatching { connectServer(config, registration) }
-                .onFailure { handleConnectFailure(config.id, it) }
+        val jobs = configs.map { config ->
+            scope.launch {
+                runCatching { connectServer(config, registration) }
+                    .onFailure { handleConnectFailure(config.id, it) }
+            }
         }
+        jobs.forEach { it.join() }
         refresh()
     }
 

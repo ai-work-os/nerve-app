@@ -52,7 +52,10 @@ class SharedPrefsServerConfigStore(
     }
 
     private fun defaultConfigs(): List<ServerConfig> =
-        listOf(ServerConfig(id = "local", name = "Local", address = "127.0.0.1:4800"))
+        listOf(
+            ServerConfig(id = "mac", name = "Mac", address = "100.109.126.37:4800"),
+            ServerConfig(id = "home", name = "Home Server", address = "100.75.43.90:4800"),
+        )
 
     companion object {
         const val PREFS_NAME: String = "nerve_servers"
