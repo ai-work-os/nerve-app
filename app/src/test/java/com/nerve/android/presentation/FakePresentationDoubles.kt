@@ -1,7 +1,6 @@
 package com.nerve.android.presentation
 
 import com.nerve.android.domain.channel.ChannelEventProcessor
-import com.nerve.android.domain.dm.DmEventProcessor
 import com.nerve.android.domain.server.ServerConnection
 import com.nerve.android.domain.server.ServerRegistry
 import com.nerve.android.domain.server.ServerNode
@@ -16,20 +15,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collect
-
-class FakeDmEventProcessor : DmEventProcessor {
-    val attachCalls = mutableListOf<Pair<String, String>>()
-    val cancelledCalls = mutableListOf<Pair<String, String>>()
-
-    override suspend fun attach(serverId: String, nodeId: String, events: Flow<NerveEvent>) {
-        attachCalls += serverId to nodeId
-        try {
-            events.collect()
-        } finally {
-            cancelledCalls += serverId to nodeId
-        }
-    }
-}
 
 class FakeChannelEventProcessor : ChannelEventProcessor {
     val attachCalls = mutableListOf<String>()

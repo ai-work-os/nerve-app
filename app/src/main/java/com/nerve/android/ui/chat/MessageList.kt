@@ -36,12 +36,20 @@ fun MessageList(
     streamingBlocks: List<ContentBlock> = emptyList(),
     onAutoScroll: (() -> Unit)? = null,
 ) {
+    val visibleMessages = remember(messages) {
+        messages.mapNotNull { msg ->
+            val text = msg.textContent
+            val displayText = text.ifBlank { msg.content }
+            if (displayText.isBlank()) return@mapNotNull null
+            if (msg.role == DmRole.ASSISTANT && displayText != msg.content) msg.copy(content = displayText) else msg
+        }
+    }
     val listState = rememberLazyListState()
 
-    LaunchedEffect(messages.size, isStreaming, streamingText, streamingBlocks) {
+    LaunchedEffect(visibleMessages.size, isStreaming, streamingText, streamingBlocks) {
         val extra = if (isStreaming) 1 else 0
-        val target = (messages.size + extra - 1).coerceAtLeast(0)
-        Logger.d("ChatScreen", "chat ui scroll bottom count=${messages.size + extra}")
+        val target = (visibleMessages.size + extra - 1).coerceAtLeast(0)
+        Logger.d("ChatScreen", "chat ui scroll bottom count=${visibleMessages.size + extra}")
         onAutoScroll?.invoke()
         listState.animateScrollToItem(target)
     }
@@ -51,7 +59,7 @@ fun MessageList(
         state = listState,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        if (messages.isEmpty()) {
+        if (visibleMessages.isEmpty() && !isStreaming) {
             item {
                 Text(
                     "Start the conversation",
@@ -60,7 +68,7 @@ fun MessageList(
                 )
             }
         }
-        items(messages, key = { it.id }) { message ->
+        items(visibleMessages, key = { it.id }) { message ->
             MessageBubble(message)
         }
         if (isStreaming) {

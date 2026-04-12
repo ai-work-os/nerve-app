@@ -1,6 +1,21 @@
 package com.nerve.android.transport
 
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
+
+/**
+ * Assembled DM message shipped in a [NerveEvent.MessageSnapshot]. Mirror of
+ * the server-side `Message` type (nerve/src/protocol.ts).
+ */
+@Serializable
+data class SnapshotMessage(
+    val id: String,
+    val nodeId: String,
+    val role: String,
+    val sender: String,
+    val text: String,
+    val ts: Double,
+)
 
 sealed interface NerveEvent {
     data class ChannelMessage(
@@ -30,6 +45,17 @@ sealed interface NerveEvent {
         val nodeId: String,
         val name: String,
         val detail: JsonObject,
+    ) : NerveEvent
+
+    /**
+     * Full assembled DM history for a node. Delivered on subscribe
+     * (first time and on reconnect-resubscribe). Replaces the client's
+     * local view for this node.
+     */
+    data class MessageSnapshot(
+        val nodeId: String,
+        val name: String,
+        val messages: List<SnapshotMessage>,
     ) : NerveEvent
 
     data class NodeStatusChanged(

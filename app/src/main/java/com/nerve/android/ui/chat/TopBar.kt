@@ -4,10 +4,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -20,6 +25,25 @@ fun TopBar(
     onStop: (() -> Unit)? = null,
     onBack: (() -> Unit)? = null,
 ) {
+    var showStopConfirm by remember { mutableStateOf(false) }
+
+    if (showStopConfirm && onStop != null) {
+        AlertDialog(
+            onDismissRequest = { showStopConfirm = false },
+            title = { Text("Stop ${state.nodeName ?: "node"}?") },
+            text = { Text("This will stop the agent process. Are you sure?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showStopConfirm = false
+                    onStop()
+                }) { Text("Stop") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showStopConfirm = false }) { Text("Cancel") }
+            },
+        )
+    }
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -46,7 +70,7 @@ fun TopBar(
                 }
             }
             onStop?.let {
-                TextButton(onClick = it) {
+                TextButton(onClick = { showStopConfirm = true }) {
                     Text("Close")
                 }
             }

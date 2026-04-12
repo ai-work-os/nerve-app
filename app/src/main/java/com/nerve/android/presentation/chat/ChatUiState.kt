@@ -7,6 +7,7 @@ data class ChatUiState(
     val nodeId: String? = null,
     val nodeName: String? = null,
     val messages: List<DmMessage> = emptyList(),
+    val streamingMessage: DmMessage? = null,
     val isStreaming: Boolean = false,
     val isSending: Boolean = false,
     val errorMessage: String? = null,

@@ -1,13 +1,15 @@
 package com.nerve.android.presentation.chat
 
 import androidx.lifecycle.ViewModel
-import com.nerve.android.domain.dm.DmEventProcessor
-import com.nerve.android.domain.dm.DmKey
+import com.nerve.android.domain.dm.ContentBlock
+import com.nerve.android.domain.dm.DmEventMapper
+import com.nerve.android.domain.dm.DmMappedEvent
 import com.nerve.android.domain.dm.DmMessage
 import com.nerve.android.domain.dm.DmRole
-import com.nerve.android.domain.dm.DmStore
+import com.nerve.android.domain.dm.DmSessionManager
 import com.nerve.android.domain.server.ServerRegistry
 import com.nerve.android.transport.NerveEvent
+import com.nerve.android.transport.SnapshotMessage
 import com.nerve.android.util.Logger
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -17,10 +19,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -29,8 +29,8 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 class ChatViewModel(
-    private val dmStore: DmStore,
-    private val dmEventProcessor: DmEventProcessor,
+    private val sessionManager: DmSessionManager,
+    private val mapper: DmEventMapper,
     private val serverRegistry: ServerRegistry,
     dispatcher: CoroutineDispatcher,
     private val onSubscribed: ((String, String) -> Unit)? = null,
@@ -52,75 +52,100 @@ class ChatViewModel(
             scope.launch(start = CoroutineStart.UNDISPATCHED) {
                 serverRegistry.client(previousServerId)?.unsubscribe(previousNodeId)
             }
+            sessionManager.reset()
         }
         messageJob?.cancel()
         attachJob?.cancel()
         streamingJob?.cancel()
         currentServerId = serverId
         currentNodeId = nodeId
-        val key = DmKey("$serverId:$nodeId")
-        Logger.d("ChatViewModel", "chat enter key=${key.value}")
+        Logger.d("ChatViewModel", "chat enter serverId=$serverId nodeId=$nodeId")
         _uiState.value = _uiState.value.copy(
             serverId = serverId,
             nodeId = nodeId,
             nodeName = nodeName,
+            streamingMessage = null,
             isStreaming = false,
             errorMessage = null,
         )
         messageJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
-            dmStore.messages(key).collect { messages ->
+            sessionManager.messages.collect { messages ->
                 _uiState.value = _uiState.value.copy(messages = messages)
             }
         }
-        scope.launch(start = CoroutineStart.UNDISPATCHED) {
+        streamingJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            sessionManager.streamingMessage.collect { streaming ->
+                _uiState.value = _uiState.value.copy(
+                    streamingMessage = streaming,
+                    isStreaming = streaming != null,
+                )
+            }
+        }
+        attachJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            serverRegistry.events
+                .filter { it.serverId == serverId }
+                .collect { scopedEvent ->
+                    val event = scopedEvent.event
+                    val eventNodeId = when (event) {
+                        is NerveEvent.NodeUpdate -> event.nodeId
+                        is NerveEvent.NodeStatusChanged -> event.nodeId
+                        is NerveEvent.MessageSnapshot -> event.nodeId
+                        else -> null
+                    }
+                    if (eventNodeId != nodeId) return@collect
+                    when (event) {
+                        is NerveEvent.MessageSnapshot -> {
+                            Logger.d(
+                                "ChatViewModel",
+                                "snapshot received nodeId=$nodeId count=${event.messages.size}",
+                            )
+                            sessionManager.replaceHistory(
+                                event.messages.map { it.toDmMessage(event.name) },
+                            )
+                        }
+                        else -> {
+                            val mapped = mapper.map(event)
+                            Logger.d(
+                                "ChatViewModel",
+                                "event mapped: ${mapped::class.simpleName} from ${event::class.simpleName}",
+                            )
+                            if (mapped != DmMappedEvent.Ignore) {
+                                sessionManager.onEvent(mapped)
+                            }
+                        }
+                    }
+                }
+        }
+        // Subscribe after collect is listening. Server sends message_snapshot
+        // immediately on subscribe (including reconnect resubscribe), which the
+        // collector above will apply via replaceHistory.
+        scope.launch {
             serverRegistry.client(serverId)?.subscribe(nodeId)
             onSubscribed?.invoke(serverId, nodeId)
         }
-        attachJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
-            dmEventProcessor.attach(
-                serverId,
-                nodeId,
-                serverRegistry.events
-                    .filter { it.serverId == serverId }
-                    .map { it.event },
-            )
+    }
+
+    private fun SnapshotMessage.toDmMessage(nodeName: String): DmMessage {
+        val dmRole = when (role) {
+            "user" -> DmRole.USER
+            "agent" -> DmRole.ASSISTANT
+            else -> DmRole.SYSTEM
         }
-        scope.launch {
-            loadSessionHistory(serverId, nodeId, nodeName)
-        }
-        streamingJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
-            serverRegistry.events
-                .filter { it.serverId == serverId }
-                .onEach { event ->
-                    when (val inner = event.event) {
-                        is NerveEvent.NodeUpdate -> {
-                            if (inner.nodeId != nodeId) return@onEach
-                            val updateKind = inner.detail["update"]
-                                ?.jsonObject
-                                ?.get("sessionUpdate")
-                                ?.jsonPrimitive
-                                ?.content
-                            when (updateKind) {
-                                "agent_message_start", "agent_message_chunk", "agent_thought_chunk" -> setStreaming(key.value, true)
-                                "agent_message_end" -> setStreaming(key.value, false)
-                            }
-                        }
-                        is NerveEvent.NodeStatusChanged -> {
-                            if (inner.nodeId == nodeId && inner.status == "idle") {
-                                setStreaming(key.value, false)
-                            }
-                        }
-                        else -> Unit
-                    }
-                }
-                .collect()
-        }
+        return DmMessage(
+            id = id,
+            role = dmRole,
+            content = text,
+            timestamp = ts.toLong(),
+            nodeId = nodeId,
+            nodeName = nodeName,
+            blocks = listOf(ContentBlock.Text(text)),
+        )
     }
 
     fun leaveDm() {
         val serverId = currentServerId ?: return
         val nodeId = currentNodeId ?: return
-        Logger.d("ChatViewModel", "chat leave key=$serverId:$nodeId")
+        Logger.d("ChatViewModel", "chat leave serverId=$serverId nodeId=$nodeId")
         messageJob?.cancel()
         attachJob?.cancel()
         streamingJob?.cancel()
@@ -129,7 +154,10 @@ class ChatViewModel(
         }
         currentServerId = null
         currentNodeId = null
+        sessionManager.reset()
         _uiState.value = _uiState.value.copy(
+            messages = emptyList(),
+            streamingMessage = null,
             isStreaming = false,
             serverId = null,
             nodeId = null,
@@ -141,19 +169,17 @@ class ChatViewModel(
         if (text.isBlank()) return
         val serverId = currentServerId ?: return
         val nodeId = currentNodeId ?: return
-        val dmKey = DmKey("$serverId:$nodeId")
         val nodeName = _uiState.value.nodeName ?: nodeId
-        Logger.d("ChatViewModel", "chat send key=${dmKey.value} len=${text.length}")
+        Logger.d("ChatViewModel", "chat send nodeId=$nodeId len=${text.length}")
         _uiState.value = _uiState.value.copy(isSending = true, errorMessage = null)
-        val userMessage = DmMessage(
-            id = "local-${System.currentTimeMillis()}",
-            role = DmRole.USER,
-            content = text,
-            timestamp = System.currentTimeMillis(),
+        val userEvent = DmMappedEvent.UserMessage(
             nodeId = nodeId,
             nodeName = nodeName,
+            content = text,
+            timestamp = System.currentTimeMillis(),
+            messageId = "local-${System.currentTimeMillis()}",
         )
-        dmStore.appendMessage(dmKey, userMessage)
+        sessionManager.onEvent(userEvent)
         runCatching {
             serverRegistry.client(serverId)?.prompt(nodeId, text)
         }.onFailure {
@@ -173,7 +199,7 @@ class ChatViewModel(
             if (sessions.isEmpty()) return
             val latestSessionId = sessions.last()
                 .jsonObject["sessionId"]?.jsonPrimitive?.content ?: return
-            Logger.d("ChatViewModel", "chat session.load key=$serverId:$nodeId sessionId=$latestSessionId")
+            Logger.d("ChatViewModel", "chat session.load serverId=$serverId nodeId=$nodeId sessionId=$latestSessionId")
             client.call(
                 "session.load",
                 buildJsonObject {
@@ -182,13 +208,8 @@ class ChatViewModel(
                 },
             )
         }.onFailure {
-            Logger.w("ChatViewModel", "chat session load failed key=$serverId:$nodeId reason=${it.message}")
+            Logger.w("ChatViewModel", "chat session load failed serverId=$serverId nodeId=$nodeId reason=${it.message}")
         }
-    }
-
-    private fun setStreaming(key: String, enabled: Boolean) {
-        Logger.d("ChatViewModel", "chat stream key=$key state=${if (enabled) "on" else "off"}")
-        _uiState.value = _uiState.value.copy(isStreaming = enabled)
     }
 
     override fun onCleared() {

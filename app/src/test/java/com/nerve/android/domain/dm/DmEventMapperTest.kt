@@ -421,6 +421,40 @@ class DmEventMapperTest {
         assertIs<DmMappedEvent.Ignore>(event)
     }
 
+    @Test
+    fun `tool_call ACP format with JsonObject rawInput does not crash`() {
+        val detail = buildJsonObject {
+            put("ts", "2026-04-07T10:00:19Z")
+            put("update", buildJsonObject {
+                put("sessionUpdate", "tool_call")
+                put("toolCallId", "toolu_obj")
+                put("_meta", buildJsonObject {
+                    put("claudeCode", buildJsonObject { put("toolName", "Bash") })
+                })
+                put("rawInput", buildJsonObject { put("command", "ls") })
+            })
+        }
+
+        val event = mapper.map(nodeUpdate(detail))
+        val mapped = assertIs<DmMappedEvent.ToolCall>(event)
+        assertEquals("toolu_obj", mapped.toolId)
+        assertEquals("Bash", mapped.toolName)
+        assertTrue(mapped.input.contains("command"), "input should contain JSON string, got: ${mapped.input}")
+    }
+
+    @Test
+    fun `malformed update detail does not crash`() {
+        val detail = buildJsonObject {
+            put("ts", "2026-04-07T10:00:20Z")
+            put("update", buildJsonObject {
+                put("sessionUpdate", buildJsonObject { put("bad", true) })
+            })
+        }
+
+        val event = mapper.map(nodeUpdate(detail))
+        assertIs<DmMappedEvent.Ignore>(event)
+    }
+
     private fun nodeUpdate(detail: kotlinx.serialization.json.JsonObject) =
         NerveEvent.NodeUpdate(nodeId = "n1", name = "bot", detail = detail)
 

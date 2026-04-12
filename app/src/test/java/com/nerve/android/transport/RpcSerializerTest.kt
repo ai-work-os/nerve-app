@@ -1,12 +1,17 @@
 package com.nerve.android.transport
 
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 
 class RpcSerializerTest {
     @Test
@@ -39,6 +44,54 @@ class RpcSerializerTest {
         assertEquals(4L, errResponse.id)
         assertEquals(-32000, errResponse.error!!.code)
         assertEquals("boom", errResponse.error!!.message)
+    }
+
+    @Test
+    fun `parseNotification message_snapshot empty`() {
+        val params = buildJsonObject {
+            put("nodeId", "n1")
+            put("name", "bob")
+            put("messages", buildJsonArray {})
+        }
+        val evt = RpcSerializer.parseNotification("message_snapshot", params)
+        val snapshot = assertIs<NerveEvent.MessageSnapshot>(evt)
+        assertEquals("n1", snapshot.nodeId)
+        assertEquals("bob", snapshot.name)
+        assertEquals(0, snapshot.messages.size)
+    }
+
+    @Test
+    fun `parseNotification message_snapshot with messages`() {
+        val params = buildJsonObject {
+            put("nodeId", "n1")
+            put("name", "bob")
+            put("messages", buildJsonArray {
+                add(buildJsonObject {
+                    put("id", "m1")
+                    put("nodeId", "n1")
+                    put("role", "user")
+                    put("sender", "renjinxi")
+                    put("text", "hi")
+                    put("ts", 1710000000000.0)
+                })
+                add(buildJsonObject {
+                    put("id", "m2")
+                    put("nodeId", "n1")
+                    put("role", "agent")
+                    put("sender", "bob")
+                    put("text", "hello")
+                    put("ts", 1710000001000.0)
+                })
+            })
+        }
+        val evt = RpcSerializer.parseNotification("message_snapshot", params)
+        val snapshot = assertIs<NerveEvent.MessageSnapshot>(evt)
+        assertEquals(2, snapshot.messages.size)
+        assertEquals("user", snapshot.messages[0].role)
+        assertEquals("hi", snapshot.messages[0].text)
+        assertEquals("agent", snapshot.messages[1].role)
+        assertEquals("hello", snapshot.messages[1].text)
+        assertEquals("bob", snapshot.messages[1].sender)
     }
 
     @Test

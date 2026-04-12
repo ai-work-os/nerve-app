@@ -12,25 +12,31 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 class DmEventMapper {
-    fun map(event: NerveEvent): DmMappedEvent = when (event) {
-        is NerveEvent.NodeUpdate -> mapNodeUpdate(event)
-        is NerveEvent.NodeStatusChanged -> {
-            if (event.status == "idle") {
-                DmMappedEvent.NodeIdle(
-                    nodeId = event.nodeId,
-                    timestamp = parseStableTimestamp(event.detail, event.nodeId, "idle"),
-                )
-            } else {
-                DmMappedEvent.Ignore
+    fun map(event: NerveEvent): DmMappedEvent = try {
+        when (event) {
+            is NerveEvent.NodeUpdate -> mapNodeUpdate(event)
+            is NerveEvent.NodeStatusChanged -> {
+                if (event.status == "idle") {
+                    DmMappedEvent.NodeIdle(
+                        nodeId = event.nodeId,
+                        timestamp = parseStableTimestamp(event.detail, event.nodeId, "idle"),
+                    )
+                } else {
+                    DmMappedEvent.Ignore
+                }
             }
-        }
 
-        else -> DmMappedEvent.Ignore
+            else -> DmMappedEvent.Ignore
+        }
+    } catch (e: Exception) {
+        Logger.w("DmEventMapper", "dm map error: ${e.message}")
+        DmMappedEvent.Ignore
     }
 
     private fun mapNodeUpdate(event: NerveEvent.NodeUpdate): DmMappedEvent {
         val update = event.detail["update"]?.jsonObject ?: return ignore(event.nodeId, "missing_update")
-        val kind = update["sessionUpdate"]?.jsonPrimitive?.content ?: return ignore(event.nodeId, "missing_kind")
+        val kind = runCatching { update["sessionUpdate"]?.jsonPrimitive?.content }.getOrNull()
+            ?: return ignore(event.nodeId, "missing_kind")
         val timestamp = parseStableTimestamp(event.detail, event.nodeId, kind)
         val text = update.extractText()
         return when (kind) {
@@ -99,7 +105,11 @@ class DmEventMapper {
                 ?.get("toolName")?.jsonPrimitive?.content
                 ?: update["title"]?.jsonPrimitive?.content
                 ?: ""
-            val input = update["rawInput"]?.jsonPrimitive?.content ?: ""
+            val rawInput = update["rawInput"]
+            val input = when (rawInput) {
+                is kotlinx.serialization.json.JsonPrimitive -> rawInput.content
+                else -> rawInput?.toString() ?: ""
+            }
             return DmMappedEvent.ToolCall(nodeId = nodeId, toolId = acpId, toolName = toolName, input = input, timestamp = timestamp)
         }
         // Legacy nested format: toolCall.{id, name, input}

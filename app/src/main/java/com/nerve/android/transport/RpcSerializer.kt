@@ -2,6 +2,7 @@ package com.nerve.android.transport
 
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -38,6 +39,16 @@ object RpcSerializer {
                     }
                 },
             )
+        }
+
+        "message_snapshot" -> {
+            val nodeId = params.string("nodeId") ?: return null
+            val name = params.string("name") ?: return null
+            val messagesJson = params["messages"] as? JsonArray ?: JsonArray(emptyList())
+            val messages = runCatching {
+                messagesJson.map { json.decodeFromJsonElement(SnapshotMessage.serializer(), it) }
+            }.getOrElse { emptyList() }
+            NerveEvent.MessageSnapshot(nodeId = nodeId, name = name, messages = messages)
         }
 
         "channel.message" -> {

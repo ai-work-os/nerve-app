@@ -12,7 +12,7 @@ class SharedPrefsServerConfigStore(
 ) : ServerConfigStore {
     override suspend fun load(): List<ServerConfig> {
         val raw = prefs.getString(KEY_SERVER_CONFIGS_JSON, null)
-        val configs = if (raw.isNullOrBlank()) {
+        val initial = if (raw.isNullOrBlank()) {
             defaultConfigs().also {
                 saveAllSync(it)
                 Logger.d("ServerConfigStore", "server default_injected id=local")
@@ -27,6 +27,17 @@ class SharedPrefsServerConfigStore(
                     Logger.d("ServerConfigStore", "server default_injected id=local")
                 }
             }
+        }
+        // Migration: ensure built-in defaults are present (additive only — never removes user entries).
+        val defaults = defaultConfigs()
+        val missing = defaults.filter { d -> initial.none { it.id == d.id } }
+        val configs = if (missing.isNotEmpty()) {
+            val merged = initial + missing
+            saveAllSync(merged)
+            Logger.d("ServerConfigStore", "server default_appended ids=${missing.joinToString(",") { it.id }}")
+            merged
+        } else {
+            initial
         }
         Logger.d("ServerConfigStore", "server load count=${configs.size}")
         return configs
@@ -54,6 +65,7 @@ class SharedPrefsServerConfigStore(
     private fun defaultConfigs(): List<ServerConfig> =
         listOf(
             ServerConfig(id = "mac", name = "Mac", address = "100.109.126.37:4800"),
+            ServerConfig(id = "mac-test", name = "Mac (test 4801)", address = "100.109.126.37:4801"),
             ServerConfig(id = "home", name = "Home Server", address = "100.75.43.90:4800"),
         )
 

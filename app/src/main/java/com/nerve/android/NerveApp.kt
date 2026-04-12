@@ -3,8 +3,8 @@ package com.nerve.android
 import android.app.Application
 import com.nerve.android.domain.channel.InMemoryChannelStore
 import com.nerve.android.domain.channel.RealChannelEventProcessor
-import com.nerve.android.domain.dm.DefaultDmEventProcessor
-import com.nerve.android.domain.dm.InMemoryDmStore
+import com.nerve.android.domain.dm.DmEventMapper
+import com.nerve.android.domain.dm.DmSessionManager
 import com.nerve.android.domain.server.NerveClientFactory
 import com.nerve.android.domain.server.RealServerRegistry
 import com.nerve.android.domain.server.ServerConfigStore
@@ -34,9 +34,9 @@ class NerveApp : Application() {
         private set
     lateinit var serverRegistry: RealServerRegistry
         private set
-    lateinit var dmStore: InMemoryDmStore
+    lateinit var sessionManager: DmSessionManager
         private set
-    lateinit var dmEventProcessor: DefaultDmEventProcessor
+    lateinit var dmEventMapper: DmEventMapper
         private set
     lateinit var channelStore: InMemoryChannelStore
         private set
@@ -58,8 +58,8 @@ class NerveApp : Application() {
         configStore = SharedPrefsServerConfigStore(
             getSharedPreferences(SharedPrefsServerConfigStore.PREFS_NAME, MODE_PRIVATE),
         )
-        dmStore = InMemoryDmStore()
-        dmEventProcessor = DefaultDmEventProcessor(dmStore)
+        sessionManager = DmSessionManager()
+        dmEventMapper = DmEventMapper()
         channelStore = InMemoryChannelStore()
         channelEventProcessor = RealChannelEventProcessor(channelStore)
         serverRegistry = RealServerRegistry(
@@ -74,8 +74,8 @@ class NerveApp : Application() {
 
     fun createChatViewModel(): ChatViewModel =
         ChatViewModel(
-            dmStore = dmStore,
-            dmEventProcessor = dmEventProcessor,
+            sessionManager = sessionManager,
+            mapper = dmEventMapper,
             serverRegistry = serverRegistry,
             dispatcher = Dispatchers.Main.immediate,
             onSubscribed = { serverId, nodeId ->

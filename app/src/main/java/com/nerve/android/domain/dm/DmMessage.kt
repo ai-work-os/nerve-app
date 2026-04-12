@@ -8,7 +8,16 @@ data class DmMessage(
     val nodeId: String,
     val nodeName: String,
     val blocks: List<ContentBlock> = emptyList(),
-)
+) {
+    /** Summary mode: only Text blocks, filtering Thinking/ToolCall. */
+    val textContent: String
+        get() {
+            if (blocks.isEmpty()) return content
+            return blocks.filterIsInstance<ContentBlock.Text>()
+                .joinToString("") { it.text }
+                .trim()
+        }
+}
 
 sealed interface ContentBlock {
     data class Text(val text: String) : ContentBlock

@@ -18,11 +18,11 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.nerve.android.MainActivity
 import com.nerve.android.NerveApp
-import com.nerve.android.domain.dm.DmEventProcessor
-import com.nerve.android.domain.dm.DmKey
+import com.nerve.android.domain.dm.DmEventMapper
+import com.nerve.android.domain.dm.DmMappedEvent
 import com.nerve.android.domain.dm.DmMessage
 import com.nerve.android.domain.dm.DmRole
-import com.nerve.android.domain.dm.DmStore
+import com.nerve.android.domain.dm.DmSessionManager
 import com.nerve.android.domain.server.ServerChannel
 import com.nerve.android.domain.server.ServerConnection
 import com.nerve.android.domain.server.ServerNode
@@ -40,12 +40,10 @@ import com.nerve.android.transport.model.NodeInfo
 import com.nerve.android.transport.model.PromptResult
 import com.nerve.android.transport.model.SpawnResult
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.collect
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -164,12 +162,12 @@ class ChatScreenTest {
 
     @Test
     fun chatRoute_enters_leaves_sends_cancels_and_shows_streaming_messages() {
-        val store = RecordingDmStore()
-        val processor = RecordingDmEventProcessor()
+        val sessionManager = DmSessionManager()
+        val mapper = DmEventMapper()
         val registry = RecordingServerRegistry()
         val client = RecordingNerveClient()
         registry.clients["s1"] = client
-        val viewModel = ChatViewModel(store, processor, registry, Dispatchers.Unconfined)
+        val viewModel = ChatViewModel(sessionManager, mapper, registry, Dispatchers.Unconfined)
         var show by mutableStateOf(true)
 
         composeRule.setContent {
@@ -187,12 +185,10 @@ class ChatScreenTest {
 
         composeRule.onNodeWithText("Start the conversation").assertIsDisplayed()
         check(client.subscribeCalls == listOf("n1"))
-        check(processor.attachCalls == listOf("s1" to "n1"))
 
-        store.appendMessage(
-            DmKey("s1:n1"),
-            DmMessage("m1", DmRole.ASSISTANT, "from-store", 100L, "n1", "bot"),
-        )
+        sessionManager.onEvent(DmMappedEvent.AgentMessageStart(nodeId = "n1", nodeName = "bot", timestamp = 99L, messageId = "m1"))
+        sessionManager.onEvent(DmMappedEvent.AgentMessageChunk(nodeId = "n1", text = "from-store", timestamp = 100L))
+        sessionManager.onEvent(DmMappedEvent.AgentMessageEnd(nodeId = "n1", nodeName = "bot", timestamp = 101L, fallbackText = null))
         composeRule.waitForIdle()
         composeRule.onNodeWithText("from-store").assertIsDisplayed()
 
@@ -254,7 +250,7 @@ class ChatScreenTest {
         ),
         )
         composeRule.waitForIdle()
-        composeRule.onAllNodesWithText("stream body").assertCountEquals(0)
+        composeRule.onAllNodesWithText("stream body").assertCountEquals(1) // finalized in messages
 
         show = false
         composeRule.waitForIdle()
@@ -263,11 +259,11 @@ class ChatScreenTest {
 
     @Test
     fun chatRoute_clears_streaming_text_on_idle_and_session_switch() {
-        val store = RecordingDmStore()
-        val processor = RecordingDmEventProcessor()
+        val sessionManager = DmSessionManager()
+        val mapper = DmEventMapper()
         val registry = RecordingServerRegistry()
         registry.clients["s1"] = RecordingNerveClient()
-        val viewModel = ChatViewModel(store, processor, registry, Dispatchers.Unconfined)
+        val viewModel = ChatViewModel(sessionManager, mapper, registry, Dispatchers.Unconfined)
         var nodeId by mutableStateOf("n1")
         var nodeName by mutableStateOf("bot-1")
 
@@ -311,7 +307,7 @@ class ChatScreenTest {
         ),
         )
         composeRule.waitForIdle()
-        composeRule.onAllNodesWithText("partial").assertCountEquals(0)
+        composeRule.onAllNodesWithText("partial").assertCountEquals(1) // flushed to finalized messages
 
         check(
             registry.eventsFlow.tryEmit(
@@ -410,31 +406,6 @@ class MainActivityChatSmokeTest {
         val method = activityRule.activity.application.javaClass.getDeclaredMethod(methodName)
         method.isAccessible = true
         return method.invoke(activityRule.activity.application) as String?
-    }
-}
-
-private class RecordingDmStore : DmStore {
-    private val flows = linkedMapOf<DmKey, MutableStateFlow<List<DmMessage>>>()
-
-    override fun messages(key: DmKey): StateFlow<List<DmMessage>> =
-        flows.getOrPut(key) { MutableStateFlow(emptyList()) }
-
-    override fun appendMessage(key: DmKey, message: DmMessage): Boolean {
-        val flow = flows.getOrPut(key) { MutableStateFlow(emptyList()) }
-        flow.value = flow.value + message
-        return true
-    }
-
-    override fun containsMessage(key: DmKey, messageId: String): Boolean =
-        flows[key]?.value?.any { it.id == messageId } == true
-}
-
-private class RecordingDmEventProcessor : DmEventProcessor {
-    val attachCalls = mutableListOf<Pair<String, String>>()
-
-    override suspend fun attach(serverId: String, nodeId: String, events: Flow<NerveEvent>) {
-        attachCalls += serverId to nodeId
-        events.collect()
     }
 }
 
