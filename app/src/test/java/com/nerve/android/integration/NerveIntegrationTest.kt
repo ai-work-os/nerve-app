@@ -94,7 +94,7 @@ class NerveIntegrationTest {
             },
         ).jsonObject
         val postedMsg = postResult["message"]!!.jsonObject
-        assertEquals(testContent, postedMsg["content"]!!.jsonPrimitive.content)
+        assertEquals("[android] $testContent", postedMsg["content"]!!.jsonPrimitive.content)
 
         // Retrieve history and verify
         val historyResult = client.call(
@@ -107,7 +107,7 @@ class NerveIntegrationTest {
         val messages = historyResult["messages"]!!.jsonArray
         assertTrue(messages.isNotEmpty(), "history should not be empty")
         val found = messages.any {
-            it.jsonObject["content"]?.jsonPrimitive?.content == testContent
+            it.jsonObject["content"]?.jsonPrimitive?.content == "[android] $testContent"
         }
         assertTrue(found, "history should contain our posted message")
     }
@@ -145,7 +145,7 @@ class NerveIntegrationTest {
                         .filterIsInstance<NerveEvent.ChannelMessage>()
                         .first {
                             it.channelId == channelId &&
-                                it.payload["message"]?.jsonObject?.get("content")?.jsonPrimitive?.content == testContent
+                                it.payload["message"]?.jsonObject?.get("content")?.jsonPrimitive?.content == "[android] $testContent"
                         }
                 }
             }
@@ -164,7 +164,7 @@ class NerveIntegrationTest {
             // Wait for event on client 1
             val event = eventDeferred.await()
             assertEquals(channelId, event.channelId)
-            assertEquals(testContent, event.payload["message"]?.jsonObject?.get("content")?.jsonPrimitive?.content)
+            assertEquals("[android] $testContent", event.payload["message"]?.jsonObject?.get("content")?.jsonPrimitive?.content)
         } finally {
             client2.disconnect()
         }

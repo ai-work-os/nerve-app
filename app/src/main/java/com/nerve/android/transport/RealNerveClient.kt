@@ -187,6 +187,7 @@ class RealNerveClient(
                     },
                 )
                 put("permissions", registration.permissions)
+                put("platform", "android")
             },
         )
     }
