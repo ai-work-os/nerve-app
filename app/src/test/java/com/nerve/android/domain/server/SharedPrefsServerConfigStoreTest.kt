@@ -16,6 +16,7 @@ class SharedPrefsServerConfigStoreTest {
         assertEquals(
             listOf(
                 ServerConfig(id = "mac", name = "Mac", address = "100.109.126.37:4800"),
+                ServerConfig(id = "mac-test", name = "Mac (test 4801)", address = "100.109.126.37:4801"),
                 ServerConfig(id = "home", name = "Home Server", address = "100.75.43.90:4800"),
             ),
             configs,
@@ -35,8 +36,10 @@ class SharedPrefsServerConfigStoreTest {
         val reloaded = SharedPrefsServerConfigStore(prefs).load()
         assertEquals(
             listOf(
+                ServerConfig(id = "mac-test", name = "Mac (test 4801)", address = "100.109.126.37:4801"),
                 ServerConfig(id = "home", name = "Home Server", address = "100.75.43.90:4800"),
                 ServerConfig(id = "office", name = "Office 2", address = "10.0.0.2:4800"),
+                ServerConfig(id = "mac", name = "Mac", address = "100.109.126.37:4800"),
             ),
             reloaded,
         )
@@ -52,6 +55,7 @@ class SharedPrefsServerConfigStoreTest {
         assertEquals(
             listOf(
                 ServerConfig(id = "mac", name = "Mac", address = "100.109.126.37:4800"),
+                ServerConfig(id = "mac-test", name = "Mac (test 4801)", address = "100.109.126.37:4801"),
                 ServerConfig(id = "home", name = "Home Server", address = "100.75.43.90:4800"),
             ),
             configs,

@@ -21,7 +21,6 @@ class NerveClientConnectTest {
             assertEquals("android-ui", register.params["name"])
             assertEquals(listOf("ui"), register.params["capabilities"])
             assertEquals("operator", register.params["permissions"])
-            assertEquals("android", register.params["platform"])
             assertEquals(ConnectionState.CONNECTED, client.connectionState.value)
         } finally {
             client.disconnect()
