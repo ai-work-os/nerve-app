@@ -138,11 +138,13 @@ class RealNerveClient(
     }
 
     override suspend fun prompt(nodeId: String, content: String): PromptResult {
+        val nodeName = lastRegistration?.name ?: "android"
+        val tagged = "$nodeName: $content"
         val result = call(
             "node.prompt",
             buildJsonObject {
                 put("nodeId", nodeId)
-                put("content", content)
+                put("content", tagged)
             },
         ).jsonObject
         return PromptResult(
@@ -187,7 +189,6 @@ class RealNerveClient(
                     },
                 )
                 put("permissions", registration.permissions)
-                put("platform", "android")
             },
         )
     }

@@ -35,6 +35,10 @@ class ChatViewModel(
     dispatcher: CoroutineDispatcher,
     private val onSubscribed: ((String, String) -> Unit)? = null,
 ) : ViewModel() {
+    companion object {
+        private const val DEFAULT_CLIENT_NAME = "android-ui"
+    }
+
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState = _uiState.asStateFlow()
@@ -170,12 +174,13 @@ class ChatViewModel(
         val serverId = currentServerId ?: return
         val nodeId = currentNodeId ?: return
         val nodeName = _uiState.value.nodeName ?: nodeId
+        val tagged = "$DEFAULT_CLIENT_NAME: $text"
         Logger.d("ChatViewModel", "chat send nodeId=$nodeId len=${text.length}")
         _uiState.value = _uiState.value.copy(isSending = true, errorMessage = null)
         val userEvent = DmMappedEvent.UserMessage(
             nodeId = nodeId,
             nodeName = nodeName,
-            content = text,
+            content = tagged,
             timestamp = System.currentTimeMillis(),
             messageId = "local-${System.currentTimeMillis()}",
         )
