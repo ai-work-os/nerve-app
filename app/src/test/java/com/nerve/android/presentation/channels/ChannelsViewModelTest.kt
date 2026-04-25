@@ -61,7 +61,7 @@ class ChannelsViewModelTest {
         assertEquals(1, joinCalls.size)
         assertEquals("c1", joinCalls[0].second["channelId"]!!.jsonPrimitive.content)
         assertEquals(1, postCalls.size)
-        assertEquals("android-ui: ping", postCalls[0].second["content"]!!.jsonPrimitive.content)
+        assertEquals("ping", postCalls[0].second["content"]!!.jsonPrimitive.content)
 
         registry.events.emit(ServerScopedEvent("s1", NerveEvent.ChannelCreated("c3", "new")))
         registry.events.emit(ServerScopedEvent("s1", NerveEvent.ChannelClosed("c1", "general")))

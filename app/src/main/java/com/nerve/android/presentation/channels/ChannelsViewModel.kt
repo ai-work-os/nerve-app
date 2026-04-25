@@ -34,10 +34,6 @@ class ChannelsViewModel(
     private val serverRegistry: ServerRegistry,
     dispatcher: CoroutineDispatcher,
 ) : ViewModel() {
-    companion object {
-        private const val DEFAULT_CLIENT_NAME = "android-ui"
-    }
-
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private val _uiState = MutableStateFlow(ChannelsUiState())
     val uiState = _uiState.asStateFlow()
@@ -107,7 +103,6 @@ class ChannelsViewModel(
         if (text.isBlank()) return
         val serverId = _uiState.value.currentServerId ?: return
         val channelId = _uiState.value.currentChannelId ?: return
-        val tagged = "$DEFAULT_CLIENT_NAME: $text"
         Logger.d("ChannelsViewModel", "channels post key=$serverId:$channelId len=${text.length}")
         _uiState.value = _uiState.value.copy(isPosting = true, errorMessage = null)
         runCatching {
@@ -115,7 +110,7 @@ class ChannelsViewModel(
                 "channel.post",
                 buildJsonObject {
                     put("channelId", channelId)
-                    put("content", tagged)
+                    put("content", text)
                 },
             )
         }.onFailure {

@@ -183,8 +183,8 @@ class ChatViewModelTest {
         vm.sendMessage("hello")
 
         val messages = vm.uiState.value.messages
-        assertTrue(messages.any { it.role == DmRole.USER && it.content == "android-ui: hello" },
-            "Expected a USER message with content 'android-ui: hello' in uiState.messages but got: $messages")
+        assertTrue(messages.any { it.role == DmRole.USER && it.content == "hello" },
+            "Expected a USER message with content 'hello' in uiState.messages but got: $messages")
     }
 
     @Test
@@ -202,7 +202,7 @@ class ChatViewModelTest {
         val userMessages = vm.uiState.value.messages.filter { it.role == DmRole.USER }
         assertEquals(1, userMessages.size,
             "Expected exactly 1 user message after sendMessage, got ${userMessages.size}: $userMessages")
-        assertEquals("android-ui: ping", userMessages.first().content)
+        assertEquals("ping", userMessages.first().content)
     }
 
     @Test
@@ -402,7 +402,7 @@ class ChatViewModelTest {
 
         // pre-fill with a stale local user message
         vm.sendMessage("stale")
-        assertTrue(vm.uiState.value.messages.any { it.content == "android-ui: stale" })
+        assertTrue(vm.uiState.value.messages.any { it.content == "stale" })
 
         // server sends snapshot with authoritative history
         registry.events.emit(
@@ -419,7 +419,7 @@ class ChatViewModelTest {
         assertEquals("real answer", msgs[1].content)
         assertEquals(DmRole.ASSISTANT, msgs[1].role)
         // stale message is gone
-        assertFalse(msgs.any { it.content == "android-ui: stale" })
+        assertFalse(msgs.any { it.content == "stale" })
     }
 
     @Test
@@ -462,7 +462,7 @@ class ChatViewModelTest {
         )
 
         // current DM's messages should be untouched
-        assertTrue(vm.uiState.value.messages.any { it.content == "android-ui: keep me" })
+        assertTrue(vm.uiState.value.messages.any { it.content == "keep me" })
         assertFalse(vm.uiState.value.messages.any { it.content == "wrong context" })
     }
 
