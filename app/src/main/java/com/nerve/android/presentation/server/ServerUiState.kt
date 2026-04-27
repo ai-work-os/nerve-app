@@ -7,5 +7,6 @@ data class ServerUiState(
     val servers: List<ServerConfig> = emptyList(),
     val connections: List<ServerConnection> = emptyList(),
     val isSubmitting: Boolean = false,
+    val isRefreshing: Boolean = false,
     val errorMessage: String? = null,
 )

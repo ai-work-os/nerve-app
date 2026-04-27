@@ -52,6 +52,14 @@ class ServerViewModel(
             .onFailure { _uiState.value = _uiState.value.copy(errorMessage = it.message) }
     }
 
+    suspend fun refresh() {
+        Logger.d("ServerViewModel", "server vm refresh")
+        _uiState.value = _uiState.value.copy(isRefreshing = true, errorMessage = null)
+        runCatching { serverRegistry.refresh() }
+            .onFailure { _uiState.value = _uiState.value.copy(errorMessage = it.message) }
+        _uiState.value = _uiState.value.copy(isRefreshing = false)
+    }
+
     override fun onCleared() {
         scope.cancel()
         super.onCleared()

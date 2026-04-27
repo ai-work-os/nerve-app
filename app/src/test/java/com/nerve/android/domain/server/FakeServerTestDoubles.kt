@@ -5,6 +5,7 @@ import com.nerve.android.transport.ClientRegistration
 import com.nerve.android.transport.ConnectionState
 import com.nerve.android.transport.NerveClient
 import com.nerve.android.transport.NerveEvent
+import com.nerve.android.transport.PromptAttachment
 import com.nerve.android.transport.ServerConfig
 import com.nerve.android.transport.model.ChannelInfo
 import com.nerve.android.transport.model.NodeInfo
@@ -31,6 +32,7 @@ class FakeNerveClient : NerveClient {
     val subscribeCalls = CopyOnWriteArrayList<String>()
     val unsubscribeCalls = CopyOnWriteArrayList<String>()
     val promptCalls = CopyOnWriteArrayList<Pair<String, String>>()
+    val imagePromptCalls = CopyOnWriteArrayList<String>()
     val spawnCalls = CopyOnWriteArrayList<Triple<String, String?, String?>>()
     val cancelCalls = CopyOnWriteArrayList<String>()
     val stopCalls = CopyOnWriteArrayList<String>()
@@ -81,8 +83,11 @@ class FakeNerveClient : NerveClient {
         unsubscribeCalls += nodeId
     }
 
-    override suspend fun prompt(nodeId: String, content: String): PromptResult {
+    override suspend fun prompt(nodeId: String, content: String, attachment: PromptAttachment?): PromptResult {
         promptCalls += nodeId to content
+        if (attachment is PromptAttachment.Image) {
+            imagePromptCalls += "${attachment.mimeType}:${attachment.data}"
+        }
         return promptResult.getOrThrow()
     }
 

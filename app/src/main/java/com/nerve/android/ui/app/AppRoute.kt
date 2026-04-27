@@ -105,6 +105,7 @@ fun AppRoute(app: NerveApp) {
                                     state = serverState,
                                     isDarkTheme = darkTheme,
                                     onToggleTheme = { darkTheme = !darkTheme },
+                                    onRefresh = { scope.launch { serverViewModel.refresh() } },
                                     onAddServer = { id, name, address ->
                                         scope.launch { serverViewModel.addServer(id, name, address) }
                                     },

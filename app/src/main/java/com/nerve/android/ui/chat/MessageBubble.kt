@@ -21,6 +21,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -101,6 +105,11 @@ private fun Avatar(label: String, isUser: Boolean) {
 fun MessageBubble(message: DmMessage, testTag: String? = null) {
     val isUser = message.role == DmRole.USER
     val context = LocalContext.current
+    val copyMessage = {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("message", message.content))
+        Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+    }
     val background = when (message.role) {
         DmRole.USER -> MaterialTheme.colorScheme.primaryContainer
         DmRole.ASSISTANT -> MaterialTheme.colorScheme.surfaceVariant
@@ -116,13 +125,28 @@ fun MessageBubble(message: DmMessage, testTag: String? = null) {
             Spacer(modifier = Modifier.width(8.dp))
         }
         Column(modifier = Modifier.weight(1f, fill = false)) {
-            if (message.role == DmRole.ASSISTANT && message.nodeName.isNotEmpty()) {
-                Text(
-                    message.nodeName,
-                    modifier = Modifier.padding(start = 4.dp, bottom = 2.dp),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (message.role == DmRole.ASSISTANT && message.nodeName.isNotEmpty()) {
+                    Text(
+                        message.nodeName,
+                        modifier = Modifier.padding(start = 4.dp, bottom = 2.dp).weight(1f, fill = false),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    Spacer(Modifier.weight(1f))
+                }
+                IconButton(
+                    onClick = copyMessage,
+                    modifier = Modifier.size(28.dp),
+                ) {
+                    Icon(
+                        Icons.Default.ContentCopy,
+                        contentDescription = "Copy message",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
             }
             Box(
                 modifier = Modifier
@@ -130,11 +154,7 @@ fun MessageBubble(message: DmMessage, testTag: String? = null) {
                     .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
                     .combinedClickable(
                         onClick = {},
-                        onLongClick = {
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            clipboard.setPrimaryClip(ClipData.newPlainText("message", message.content))
-                            Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
-                        },
+                        onLongClick = copyMessage,
                     )
                     .background(background, RoundedCornerShape(16.dp))
                     .padding(horizontal = 12.dp, vertical = 8.dp),

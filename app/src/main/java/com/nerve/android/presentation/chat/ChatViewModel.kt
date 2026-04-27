@@ -9,6 +9,7 @@ import com.nerve.android.domain.dm.DmRole
 import com.nerve.android.domain.dm.DmSessionManager
 import com.nerve.android.domain.server.ServerRegistry
 import com.nerve.android.transport.NerveEvent
+import com.nerve.android.transport.PromptAttachment
 import com.nerve.android.transport.SnapshotMessage
 import com.nerve.android.util.Logger
 import kotlinx.coroutines.CoroutineDispatcher
@@ -182,6 +183,35 @@ class ChatViewModel(
         sessionManager.onEvent(userEvent)
         runCatching {
             serverRegistry.client(serverId)?.prompt(nodeId, text)
+        }.onFailure {
+            _uiState.value = _uiState.value.copy(errorMessage = it.message)
+        }
+        _uiState.value = _uiState.value.copy(isSending = false)
+    }
+
+    suspend fun sendImage(caption: String, mimeType: String, base64Data: String) {
+        val serverId = currentServerId ?: return
+        val nodeId = currentNodeId ?: return
+        val nodeName = _uiState.value.nodeName ?: nodeId
+        val text = caption.ifBlank { "Image" }
+        val localText = "$text\n[image:$mimeType]"
+        Logger.d("ChatViewModel", "chat send image nodeId=$nodeId mime=$mimeType bytes=${base64Data.length}")
+        _uiState.value = _uiState.value.copy(isSending = true, errorMessage = null)
+        sessionManager.onEvent(
+            DmMappedEvent.UserMessage(
+                nodeId = nodeId,
+                nodeName = nodeName,
+                content = localText,
+                timestamp = System.currentTimeMillis(),
+                messageId = "local-image-${System.currentTimeMillis()}",
+            ),
+        )
+        runCatching {
+            serverRegistry.client(serverId)?.prompt(
+                nodeId,
+                text,
+                PromptAttachment.Image(mimeType = mimeType, data = base64Data),
+            )
         }.onFailure {
             _uiState.value = _uiState.value.copy(errorMessage = it.message)
         }

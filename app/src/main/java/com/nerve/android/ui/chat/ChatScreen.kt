@@ -26,6 +26,7 @@ fun ChatScreen(
     streamingBlocks: List<ContentBlock> = emptyList(),
     canSend: Boolean = true,
     onSend: (String) -> Unit,
+    onPickImage: () -> Unit,
     onCancel: () -> Unit,
     onStop: (() -> Unit)? = null,
     onBack: (() -> Unit)? = null,
@@ -70,6 +71,7 @@ fun ChatScreen(
                 canSend = canSend,
                 isSending = state.isSending,
                 onSend = onSend,
+                onPickImage = onPickImage,
             )
         }
     }

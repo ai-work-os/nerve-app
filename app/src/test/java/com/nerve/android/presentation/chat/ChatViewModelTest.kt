@@ -206,6 +206,23 @@ class ChatViewModelTest {
     }
 
     @Test
+    fun `sendImage sends prompt with image attachment and local user message`() = runTest {
+        val sessionManager = DmSessionManager()
+        val mapper = DmEventMapper()
+        val registry = FakeServerRegistry()
+        val client = FakeNerveClient()
+        registry.clients["s1"] = client
+        val vm = ChatViewModel(sessionManager, mapper, registry, Dispatchers.Unconfined)
+
+        vm.enterDm("s1", "n1", "bot")
+        vm.sendImage("see this", "image/png", "abc123")
+
+        assertEquals(listOf("n1" to "see this"), client.promptCalls)
+        assertEquals(listOf("image/png:abc123"), client.imagePromptCalls)
+        assertTrue(vm.uiState.value.messages.any { it.role == DmRole.USER && it.content == "see this\n[image:image/png]" })
+    }
+
+    @Test
     fun `thinking chunk sets isStreaming true`() = runTest {
         val sessionManager = DmSessionManager()
         val mapper = DmEventMapper()

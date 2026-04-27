@@ -31,6 +31,17 @@ class ServerViewModelTest {
     }
 
     @Test
+    fun `refresh delegates registry refresh and toggles refreshing state`() = runTest {
+        val registry = FakeServerRegistry()
+        val vm = ServerViewModel(registry, Dispatchers.Unconfined)
+
+        vm.refresh()
+
+        assertEquals(listOf<String?>(null), registry.refreshCalls)
+        assertEquals(false, vm.uiState.value.isRefreshing)
+    }
+
+    @Test
     fun `server ui follows later registry updates`() = runTest {
         val registry = FakeServerRegistry()
         val vm = ServerViewModel(registry, Dispatchers.Unconfined)

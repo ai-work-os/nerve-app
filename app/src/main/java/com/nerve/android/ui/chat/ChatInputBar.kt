@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -24,6 +25,7 @@ fun ChatInputBar(
     canSend: Boolean,
     isSending: Boolean,
     onSend: (String) -> Unit,
+    onPickImage: () -> Unit,
 ) {
     var text by rememberSaveable { mutableStateOf("") }
     val enabled = canSend && text.isNotBlank() && !isSending
@@ -51,6 +53,13 @@ fun ChatInputBar(
                 },
             ),
         )
+        IconButton(
+            onClick = onPickImage,
+            enabled = canSend && !isSending,
+            modifier = Modifier.padding(vertical = 12.dp),
+        ) {
+            Icon(Icons.Default.Image, contentDescription = "Upload image")
+        }
         IconButton(
             onClick = {
                 if (!enabled) return@IconButton

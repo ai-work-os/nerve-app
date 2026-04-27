@@ -10,6 +10,13 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 
+sealed interface PromptAttachment {
+    data class Image(
+        val mimeType: String,
+        val data: String,
+    ) : PromptAttachment
+}
+
 interface NerveClient {
     val connectionState: StateFlow<ConnectionState>
     val events: SharedFlow<NerveEvent>
@@ -23,7 +30,7 @@ interface NerveClient {
     suspend fun listChannels(): List<ChannelInfo>
     suspend fun subscribe(nodeId: String)
     suspend fun unsubscribe(nodeId: String)
-    suspend fun prompt(nodeId: String, content: String): PromptResult
+    suspend fun prompt(nodeId: String, content: String, attachment: PromptAttachment? = null): PromptResult
     suspend fun spawnNode(adapter: String, name: String?, cwd: String?): SpawnResult
     suspend fun cancelNode(nodeId: String)
     suspend fun stopNode(nodeId: String)
