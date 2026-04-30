@@ -1,5 +1,8 @@
 package com.nerve.android.util
 
+import android.content.Context
+import java.time.Instant
+
 interface LogBackend {
     fun d(tag: String, message: String)
     fun w(tag: String, message: String)
@@ -40,7 +43,7 @@ class FileLogBackend(
 
     @Synchronized
     private fun write(line: String) {
-        currentFile.appendText(line + "\n")
+        currentFile.appendText("${Instant.now()} $line\n")
         if (currentFile.length() > maxFileSize) {
             currentFile = newLogFile()
             pruneOldFiles()
@@ -74,6 +77,20 @@ object Logger {
     fun d(tag: String, message: String) = backend.d(tag, message)
     fun w(tag: String, message: String) = backend.w(tag, message)
     fun e(tag: String, message: String, throwable: Throwable? = null) = backend.e(tag, message, throwable)
+
+    fun init(context: Context) {
+        initFileLogging(java.io.File(context.filesDir, "logs"), AndroidLogBackend())
+    }
+
+    fun initFileLogging(logsDir: java.io.File, primaryBackend: LogBackend = detectBackend()) {
+        backend = CompositeLogBackend(
+            listOf(
+                primaryBackend,
+                FileLogBackend(logsDir),
+            ),
+        )
+        d("Logger", "logger initialized fileLogging=true dir=${logsDir.absolutePath}")
+    }
 
     fun detectBackend(): LogBackend = try {
         Class.forName("android.util.Log")
