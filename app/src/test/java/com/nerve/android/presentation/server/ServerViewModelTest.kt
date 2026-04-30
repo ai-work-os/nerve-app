@@ -6,12 +6,14 @@ import com.nerve.android.domain.server.ServerConnection
 import com.nerve.android.transport.ConnectionState
 import com.nerve.android.transport.ServerConfig
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class ServerViewModelTest {
     @Test
     fun `server ui follows registry and delegates add remove`() = runTest {
@@ -38,6 +40,17 @@ class ServerViewModelTest {
         vm.refresh()
 
         assertEquals(listOf<String?>(null), registry.refreshCalls)
+        assertEquals(false, vm.uiState.value.isRefreshing)
+    }
+
+    @Test
+    fun `refreshServer delegates targeted registry refresh and toggles refreshing state`() = runTest {
+        val registry = FakeServerRegistry()
+        val vm = ServerViewModel(registry, Dispatchers.Unconfined)
+
+        vm.refreshServer("s1")
+
+        assertEquals(listOf<String?>("s1"), registry.refreshCalls)
         assertEquals(false, vm.uiState.value.isRefreshing)
     }
 

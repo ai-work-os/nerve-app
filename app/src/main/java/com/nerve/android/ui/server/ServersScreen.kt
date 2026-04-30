@@ -55,6 +55,7 @@ fun ServersScreen(
     isDarkTheme: Boolean,
     onToggleTheme: () -> Unit,
     onRefresh: () -> Unit,
+    onRefreshServer: (serverId: String) -> Unit,
     onAddServer: (id: String, name: String, address: String) -> Unit,
     onRemoveServer: (serverId: String) -> Unit,
 ) {
@@ -143,6 +144,16 @@ fun ServersScreen(
                                         server.address,
                                         fontSize = 12.sp,
                                         fontFamily = FontFamily.Monospace,
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { onRefreshServer(server.id) },
+                                    enabled = !state.isRefreshing,
+                                ) {
+                                    Icon(
+                                        Icons.Default.Refresh,
+                                        contentDescription = "Refresh ${server.name}",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
                                 IconButton(onClick = { onRemoveServer(server.id) }) {
