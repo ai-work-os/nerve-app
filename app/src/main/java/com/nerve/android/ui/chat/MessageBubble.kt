@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
@@ -40,6 +41,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.nerve.android.domain.dm.DmAction
 import com.nerve.android.domain.dm.DmMessage
 import com.nerve.android.domain.dm.DmRole
 import io.noties.markwon.Markwon
@@ -102,7 +104,11 @@ private fun Avatar(label: String, isUser: Boolean) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun MessageBubble(message: DmMessage, testTag: String? = null) {
+fun MessageBubble(
+    message: DmMessage,
+    testTag: String? = null,
+    onOpenDm: ((String, String, String) -> Unit)? = null,
+) {
     val isUser = message.role == DmRole.USER
     val context = LocalContext.current
     val copyMessage = {
@@ -159,7 +165,21 @@ fun MessageBubble(message: DmMessage, testTag: String? = null) {
                     .background(background, RoundedCornerShape(16.dp))
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
-                MarkdownText(message.content)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val action = message.action
+                    if (action == null) {
+                        MarkdownText(message.content)
+                    } else {
+                        Text(message.content)
+                    }
+                    if (action is DmAction.OpenDm && onOpenDm != null) {
+                        Button(
+                            onClick = { onOpenDm(action.serverId, action.nodeId, action.nodeName) },
+                        ) {
+                            Text("进入私聊")
+                        }
+                    }
+                }
             }
         }
         if (isUser) {

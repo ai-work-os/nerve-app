@@ -71,6 +71,28 @@ class NerveEventParserTest {
     }
 
     @Test
+    fun `node spawned event is parsed`() {
+        val event = RpcSerializer.parseNotification(
+            method = "node.spawned",
+            params = buildJsonObject {
+                put("nodeId", "child-1")
+                put("name", "worker")
+                put("adapter", "codex")
+                put("spawnedByNodeId", "parent-1")
+                put("spawnedByNodeName", "main")
+                put("channelId", "ch-1")
+            },
+        )
+
+        val spawned = assertIs<NerveEvent.NodeSpawned>(event)
+        assertEquals("child-1", spawned.nodeId)
+        assertEquals("worker", spawned.name)
+        assertEquals("parent-1", spawned.spawnedByNodeId)
+        assertEquals("main", spawned.spawnedByNodeName)
+        assertEquals("ch-1", spawned.channelId)
+    }
+
+    @Test
     fun `known notification with missing required field is ignored`() {
         val event = RpcSerializer.parseNotification(
             method = "node.update",

@@ -141,6 +141,42 @@ class ChatScreenTest {
     }
 
     @Test
+    fun chatScreen_openDmAction_invokesCallback() {
+        var opened: Triple<String, String, String>? = null
+        composeRule.setContent {
+            ChatScreen(
+                state = ChatUiState(
+                    serverId = "s1",
+                    nodeId = "parent-1",
+                    nodeName = "main",
+                    messages = listOf(
+                        DmMessage(
+                            id = "spawn-child-1",
+                            role = DmRole.SYSTEM,
+                            content = "已创建 worker",
+                            timestamp = 100L,
+                            nodeId = "parent-1",
+                            nodeName = "main",
+                            action = com.nerve.android.domain.dm.DmAction.OpenDm("s1", "child-1", "worker"),
+                        ),
+                    ),
+                ),
+                streamingText = "",
+                onSend = {},
+                onPickImage = {},
+                onCancel = {},
+                onOpenDm = { serverId, nodeId, nodeName ->
+                    opened = Triple(serverId, nodeId, nodeName)
+                },
+            )
+        }
+
+        composeRule.onNodeWithText("已创建 worker").assertIsDisplayed()
+        composeRule.onNodeWithText("进入私聊").performClick()
+        check(opened == Triple("s1", "child-1", "worker"))
+    }
+
+    @Test
     fun messageList_retriggers_auto_scroll_when_streaming_text_grows() {
         var streamingText by mutableStateOf("a")
         var autoScrollCalls = 0

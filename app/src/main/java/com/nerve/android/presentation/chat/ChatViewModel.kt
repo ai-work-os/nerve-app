@@ -2,6 +2,7 @@ package com.nerve.android.presentation.chat
 
 import androidx.lifecycle.ViewModel
 import com.nerve.android.domain.dm.ContentBlock
+import com.nerve.android.domain.dm.DmAction
 import com.nerve.android.domain.dm.DmEventMapper
 import com.nerve.android.domain.dm.DmMappedEvent
 import com.nerve.android.domain.dm.DmMessage
@@ -91,6 +92,7 @@ class ChatViewModel(
                         is NerveEvent.NodeUpdate -> event.nodeId
                         is NerveEvent.NodeStatusChanged -> event.nodeId
                         is NerveEvent.MessageSnapshot -> event.nodeId
+                        is NerveEvent.NodeSpawned -> event.spawnedByNodeId
                         else -> null
                     }
                     if (eventNodeId != nodeId) return@collect
@@ -101,7 +103,29 @@ class ChatViewModel(
                                 "snapshot received nodeId=$nodeId count=${event.messages.size}",
                             )
                             sessionManager.replaceHistory(
-                                event.messages.map { it.toDmMessage(event.name) },
+                                event.messages.map { it.toDmMessage(serverId, event.name) },
+                            )
+                        }
+                        is NerveEvent.NodeSpawned -> {
+                            Logger.d(
+                                "ChatViewModel",
+                                "node spawned in dm parent=$nodeId child=${event.nodeId} name=${event.name}",
+                            )
+                            sessionManager.addSystemMessage(
+                                DmMessage(
+                                    id = "spawn-${event.nodeId}-${System.currentTimeMillis()}",
+                                    role = DmRole.SYSTEM,
+                                    content = "已创建 ${event.name}",
+                                    timestamp = System.currentTimeMillis(),
+                                    nodeId = nodeId,
+                                    nodeName = nodeName,
+                                    blocks = listOf(ContentBlock.Text("已创建 ${event.name}")),
+                                    action = DmAction.OpenDm(
+                                        serverId = serverId,
+                                        nodeId = event.nodeId,
+                                        nodeName = event.name,
+                                    ),
+                                ),
                             )
                         }
                         else -> {
@@ -126,11 +150,18 @@ class ChatViewModel(
         }
     }
 
-    private fun SnapshotMessage.toDmMessage(nodeName: String): DmMessage {
+    private fun SnapshotMessage.toDmMessage(serverId: String, nodeName: String): DmMessage {
         val dmRole = when (role) {
             "user" -> DmRole.USER
             "agent" -> DmRole.ASSISTANT
             else -> DmRole.SYSTEM
+        }
+        val dmAction = action?.let {
+            if (it.type == "open_dm" && it.nodeId != null && it.nodeName != null) {
+                DmAction.OpenDm(serverId = serverId, nodeId = it.nodeId, nodeName = it.nodeName)
+            } else {
+                null
+            }
         }
         return DmMessage(
             id = id,
@@ -140,6 +171,7 @@ class ChatViewModel(
             nodeId = nodeId,
             nodeName = nodeName,
             blocks = listOf(ContentBlock.Text(text)),
+            action = dmAction,
         )
     }
 

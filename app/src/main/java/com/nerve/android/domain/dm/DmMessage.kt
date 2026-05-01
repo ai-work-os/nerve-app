@@ -8,6 +8,7 @@ data class DmMessage(
     val nodeId: String,
     val nodeName: String,
     val blocks: List<ContentBlock> = emptyList(),
+    val action: DmAction? = null,
 ) {
     /** Summary mode: only Text blocks, filtering Thinking/ToolCall. */
     val textContent: String
@@ -17,6 +18,18 @@ data class DmMessage(
                 .joinToString("") { it.text }
                 .trim()
         }
+}
+
+sealed interface DmAction {
+    val serverId: String
+    val nodeId: String
+    val nodeName: String
+
+    data class OpenDm(
+        override val serverId: String,
+        override val nodeId: String,
+        override val nodeName: String,
+    ) : DmAction
 }
 
 sealed interface ContentBlock {

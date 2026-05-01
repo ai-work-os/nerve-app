@@ -72,6 +72,11 @@ class DmSessionManager {
         _messages.value = messages
     }
 
+    fun addSystemMessage(message: DmMessage) {
+        Logger.d("DmSessionManager", "system message id=${message.id} action=${message.action != null}")
+        addMessage(message)
+    }
+
     // --- internals ---
 
     private fun handleStart(event: DmMappedEvent.AgentMessageStart) {

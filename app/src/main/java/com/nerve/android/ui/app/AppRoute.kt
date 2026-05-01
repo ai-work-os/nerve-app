@@ -165,6 +165,9 @@ fun AppRoute(app: NerveApp) {
                         nodeId = current.nodeId,
                         nodeName = current.nodeName,
                         onBack = { nav.back() },
+                        onOpenDm = { serverId, nodeId, nodeName ->
+                            nav.openChat(serverId, nodeId, nodeName)
+                        },
                     )
                 }
 

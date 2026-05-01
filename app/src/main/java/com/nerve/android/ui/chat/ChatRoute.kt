@@ -24,6 +24,7 @@ fun ChatRoute(
     nodeName: String,
     onBack: (() -> Unit)? = null,
     onEnter: ((String, String) -> Unit)? = null,
+    onOpenDm: ((String, String, String) -> Unit)? = null,
 ) {
     val state by viewModel.uiState.collectAsState()
     val scope = rememberCoroutineScope()
@@ -69,5 +70,6 @@ fun ChatRoute(
             scope.launch { serverRegistry.client(serverId)?.stopNode(nodeId) }
         },
         onBack = onBack,
+        onOpenDm = onOpenDm,
     )
 }
