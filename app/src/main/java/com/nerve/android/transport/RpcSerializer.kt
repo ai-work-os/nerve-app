@@ -84,6 +84,21 @@ object RpcSerializer {
             NerveEvent.NodeRegistered(nodeId, params.string("name"))
         }
 
+        "node.spawned" -> {
+            val nodeId = params.string("nodeId") ?: return null
+            val name = params.string("name") ?: return null
+            val spawnedByNodeId = params.string("spawnedByNodeId") ?: return null
+            val spawnedByNodeName = params.string("spawnedByNodeName") ?: return null
+            NerveEvent.NodeSpawned(
+                nodeId = nodeId,
+                name = name,
+                adapter = params.string("adapter"),
+                spawnedByNodeId = spawnedByNodeId,
+                spawnedByNodeName = spawnedByNodeName,
+                channelId = params.string("channelId"),
+            )
+        }
+
         "node.stopped" -> {
             val nodeId = params.string("nodeId") ?: return null
             NerveEvent.NodeStopped(nodeId)

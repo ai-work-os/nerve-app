@@ -1,6 +1,7 @@
 package com.nerve.android.presentation.chat
 
 import androidx.lifecycle.ViewModel
+import com.nerve.android.domain.dm.DmAction
 import com.nerve.android.domain.dm.DmEventMapper
 import com.nerve.android.domain.dm.DmKey
 import com.nerve.android.domain.dm.DmMappedEvent
@@ -11,6 +12,7 @@ import com.nerve.android.domain.server.FakeNerveClient
 import com.nerve.android.domain.server.ServerScopedEvent
 import com.nerve.android.presentation.FakeServerRegistry
 import com.nerve.android.transport.NerveEvent
+import com.nerve.android.transport.SnapshotAction
 import com.nerve.android.transport.SnapshotMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -22,6 +24,7 @@ import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -206,6 +209,23 @@ class ChatViewModelTest {
     }
 
     @Test
+    fun `sendImage sends prompt with image attachment and local user message`() = runTest {
+        val sessionManager = DmSessionManager()
+        val mapper = DmEventMapper()
+        val registry = FakeServerRegistry()
+        val client = FakeNerveClient()
+        registry.clients["s1"] = client
+        val vm = ChatViewModel(sessionManager, mapper, registry, Dispatchers.Unconfined)
+
+        vm.enterDm("s1", "n1", "bot")
+        vm.sendImage("see this", "image/png", "abc123")
+
+        assertEquals(listOf("n1" to "see this"), client.promptCalls)
+        assertEquals(listOf("image/png:abc123"), client.imagePromptCalls)
+        assertTrue(vm.uiState.value.messages.any { it.role == DmRole.USER && it.content == "see this\n[image:image/png]" })
+    }
+
+    @Test
     fun `thinking chunk sets isStreaming true`() = runTest {
         val sessionManager = DmSessionManager()
         val mapper = DmEventMapper()
@@ -281,6 +301,67 @@ class ChatViewModelTest {
         registry.events.emit(scoped("s1", idleEvent("n1")))
         assertFalse(vm.uiState.value.isStreaming,
             "node idle must reset isStreaming even without agent_message_end")
+    }
+
+    @Test
+    fun `node spawned from current dm adds persistent open dm action`() = runTest {
+        val sessionManager = DmSessionManager()
+        val mapper = DmEventMapper()
+        val registry = FakeServerRegistry()
+        val client = FakeNerveClient()
+        registry.clients["s1"] = client
+        val vm = ChatViewModel(sessionManager, mapper, registry, Dispatchers.Unconfined)
+
+        vm.enterDm("s1", "parent-1", "main")
+        registry.events.emit(
+            scoped(
+                "s1",
+                NerveEvent.NodeSpawned(
+                    nodeId = "child-1",
+                    name = "worker",
+                    adapter = "codex",
+                    spawnedByNodeId = "parent-1",
+                    spawnedByNodeName = "main",
+                    channelId = "ch-1",
+                ),
+            ),
+        )
+
+        val actionMessage = vm.uiState.value.messages.single { it.role == DmRole.SYSTEM }
+        assertEquals("已创建 worker", actionMessage.content)
+        assertEquals("child-1", actionMessage.action?.nodeId)
+        assertEquals("worker", actionMessage.action?.nodeName)
+        assertEquals("s1", actionMessage.action?.serverId)
+    }
+
+    @Test
+    fun `spawned action remains after stream ends`() = runTest {
+        val sessionManager = DmSessionManager()
+        val mapper = DmEventMapper()
+        val registry = FakeServerRegistry()
+        val client = FakeNerveClient()
+        registry.clients["s1"] = client
+        val vm = ChatViewModel(sessionManager, mapper, registry, Dispatchers.Unconfined)
+
+        vm.enterDm("s1", "parent-1", "main")
+        registry.events.emit(scoped("s1", nodeUpdateEvent("parent-1", "main", "agent_message_chunk", text = "creating")))
+        registry.events.emit(
+            scoped(
+                "s1",
+                NerveEvent.NodeSpawned(
+                    nodeId = "child-1",
+                    name = "worker",
+                    adapter = "codex",
+                    spawnedByNodeId = "parent-1",
+                    spawnedByNodeName = "main",
+                    channelId = null,
+                ),
+            ),
+        )
+        registry.events.emit(scoped("s1", nodeUpdateEvent("parent-1", "main", "agent_message_end")))
+
+        assertTrue(vm.uiState.value.messages.any { it.action?.nodeId == "child-1" })
+        assertTrue(vm.uiState.value.messages.any { it.role == DmRole.ASSISTANT && it.content == "creating" })
     }
 
     // === New cases ===
@@ -464,6 +545,48 @@ class ChatViewModelTest {
         // current DM's messages should be untouched
         assertTrue(vm.uiState.value.messages.any { it.content == "keep me" })
         assertFalse(vm.uiState.value.messages.any { it.content == "wrong context" })
+    }
+
+    @Test
+    fun `message_snapshot restores open dm action`() = runTest {
+        val sessionManager = DmSessionManager()
+        val mapper = DmEventMapper()
+        val registry = FakeServerRegistry()
+        val client = FakeNerveClient()
+        registry.clients["s1"] = client
+        val vm = ChatViewModel(sessionManager, mapper, registry, Dispatchers.Unconfined)
+
+        vm.enterDm("s1", "parent-1", "parent")
+
+        registry.events.emit(
+            scoped(
+                "s1",
+                NerveEvent.MessageSnapshot(
+                    nodeId = "parent-1",
+                    name = "parent",
+                    messages = listOf(
+                        SnapshotMessage(
+                            id = "spawn-child-1",
+                            nodeId = "parent-1",
+                            role = "system",
+                            sender = "parent",
+                            text = "已创建 worker",
+                            ts = 1710000000000.0,
+                            action = SnapshotAction(
+                                type = "open_dm",
+                                nodeId = "child-1",
+                                nodeName = "worker",
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        val action = assertIs<DmAction.OpenDm>(vm.uiState.value.messages.single().action)
+        assertEquals("s1", action.serverId)
+        assertEquals("child-1", action.nodeId)
+        assertEquals("worker", action.nodeName)
     }
 
     // === Replay via live events (legacy path) ===

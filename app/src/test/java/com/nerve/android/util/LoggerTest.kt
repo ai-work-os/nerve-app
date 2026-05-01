@@ -82,6 +82,24 @@ class LoggerTest {
         assertTrue(backend is PrintlnLogBackend)
     }
 
+    @Test
+    fun `initFileLogging writes to android and file backends`(@TempDir tempDir: File) {
+        val androidSpy = SpyLogBackend()
+
+        Logger.initFileLogging(tempDir, androidSpy)
+        Logger.d("Init", "persist me")
+
+        assertEquals(2, androidSpy.entries.size)
+        assertEquals("logger initialized fileLogging=true dir=${tempDir.absolutePath}", androidSpy.entries[0].message)
+        assertEquals("persist me", androidSpy.entries[1].message)
+
+        val content = tempDir.listFiles()?.filter { it.extension == "log" }
+            ?.joinToString("\n") { it.readText() }
+            .orEmpty()
+        assertTrue(content.contains("logger initialized fileLogging=true"), "file log should contain init line")
+        assertTrue(content.contains("D/Init persist me"), "file log should contain app log line")
+    }
+
     private class SpyLogBackend : LogBackend {
         data class Entry(val level: String, val tag: String, val message: String, val throwable: Throwable? = null)
         val entries = mutableListOf<Entry>()
@@ -105,6 +123,7 @@ class FileLogBackendTest {
         val logFiles = tempDir.listFiles()?.filter { it.extension == "log" } ?: emptyList()
         assertTrue(logFiles.isNotEmpty(), "Expected at least one log file")
         val content = logFiles.first().readText()
+        assertTrue(content.contains(Regex("""\d{4}-\d{2}-\d{2}T""")), "Log file should contain timestamp")
         assertTrue(content.contains("MyTag"), "Log file should contain tag")
         assertTrue(content.contains("hello world"), "Log file should contain message")
     }

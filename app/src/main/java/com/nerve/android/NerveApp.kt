@@ -15,6 +15,7 @@ import com.nerve.android.presentation.nodes.NodesViewModel
 import com.nerve.android.presentation.server.ServerViewModel
 import com.nerve.android.transport.ClientRegistration
 import com.nerve.android.transport.RealNerveClient
+import com.nerve.android.util.Logger
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.Dispatchers
@@ -55,6 +56,7 @@ class NerveApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        Logger.init(this)
         configStore = SharedPrefsServerConfigStore(
             getSharedPreferences(SharedPrefsServerConfigStore.PREFS_NAME, MODE_PRIVATE),
         )

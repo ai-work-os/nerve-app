@@ -87,7 +87,7 @@ private class BlockingNerveClient(
     override suspend fun listChannels(): List<ChannelInfo> = emptyList()
     override suspend fun subscribe(nodeId: String) {}
     override suspend fun unsubscribe(nodeId: String) {}
-    override suspend fun prompt(nodeId: String, content: String) = PromptResult(stopReason = null)
+    override suspend fun prompt(nodeId: String, content: String, attachment: com.nerve.android.transport.PromptAttachment?) = PromptResult(stopReason = null)
     override suspend fun spawnNode(adapter: String, name: String?, cwd: String?) = SpawnResult(nodeId = null)
     override suspend fun cancelNode(nodeId: String) {}
     override suspend fun stopNode(nodeId: String) {}

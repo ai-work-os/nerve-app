@@ -88,6 +88,7 @@ fun ChannelChatScreen(
             canSend = true,
             isSending = isPosting,
             onSend = onSend,
+            onPickImage = {},
         )
     }
 }

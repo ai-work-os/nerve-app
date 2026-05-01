@@ -81,6 +81,11 @@ class RpcSerializerTest {
                     put("sender", "bob")
                     put("text", "hello")
                     put("ts", 1710000001000.0)
+                    put("action", buildJsonObject {
+                        put("type", "open_dm")
+                        put("nodeId", "child-1")
+                        put("nodeName", "worker")
+                    })
                 })
             })
         }
@@ -92,6 +97,9 @@ class RpcSerializerTest {
         assertEquals("agent", snapshot.messages[1].role)
         assertEquals("hello", snapshot.messages[1].text)
         assertEquals("bob", snapshot.messages[1].sender)
+        assertEquals("open_dm", snapshot.messages[1].action?.type)
+        assertEquals("child-1", snapshot.messages[1].action?.nodeId)
+        assertEquals("worker", snapshot.messages[1].action?.nodeName)
     }
 
     @Test

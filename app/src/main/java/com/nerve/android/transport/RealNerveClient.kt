@@ -137,12 +137,28 @@ class RealNerveClient(
         Logger.d("NerveClient", "unsubscribe nodeId=$nodeId")
     }
 
-    override suspend fun prompt(nodeId: String, content: String): PromptResult {
+    override suspend fun prompt(nodeId: String, content: String, attachment: PromptAttachment?): PromptResult {
         val result = call(
             "node.prompt",
             buildJsonObject {
                 put("nodeId", nodeId)
                 put("content", content)
+                if (attachment != null) {
+                    put(
+                        "attachments",
+                        buildJsonArray {
+                            when (attachment) {
+                                is PromptAttachment.Image -> add(
+                                    buildJsonObject {
+                                        put("type", "image")
+                                        put("mimeType", attachment.mimeType)
+                                        put("data", attachment.data)
+                                    },
+                                )
+                            }
+                        },
+                    )
+                }
             },
         ).jsonObject
         return PromptResult(

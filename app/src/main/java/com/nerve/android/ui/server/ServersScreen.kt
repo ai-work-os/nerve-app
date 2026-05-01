@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -53,6 +54,8 @@ fun ServersScreen(
     state: ServerUiState,
     isDarkTheme: Boolean,
     onToggleTheme: () -> Unit,
+    onRefresh: () -> Unit,
+    onRefreshServer: (serverId: String) -> Unit,
     onAddServer: (id: String, name: String, address: String) -> Unit,
     onRemoveServer: (serverId: String) -> Unit,
 ) {
@@ -68,6 +71,9 @@ fun ServersScreen(
                             if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
                             contentDescription = "Toggle theme",
                         )
+                    }
+                    IconButton(onClick = onRefresh, enabled = !state.isRefreshing) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh servers")
                     }
                     IconButton(onClick = { showAddDialog = true }) {
                         Icon(Icons.Default.Add, contentDescription = "Add server")
@@ -138,6 +144,16 @@ fun ServersScreen(
                                         server.address,
                                         fontSize = 12.sp,
                                         fontFamily = FontFamily.Monospace,
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { onRefreshServer(server.id) },
+                                    enabled = !state.isRefreshing,
+                                ) {
+                                    Icon(
+                                        Icons.Default.Refresh,
+                                        contentDescription = "Refresh ${server.name}",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
                                 IconButton(onClick = { onRemoveServer(server.id) }) {

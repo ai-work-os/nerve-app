@@ -105,6 +105,10 @@ fun AppRoute(app: NerveApp) {
                                     state = serverState,
                                     isDarkTheme = darkTheme,
                                     onToggleTheme = { darkTheme = !darkTheme },
+                                    onRefresh = { scope.launch { serverViewModel.refresh() } },
+                                    onRefreshServer = { serverId ->
+                                        scope.launch { serverViewModel.refreshServer(serverId) }
+                                    },
                                     onAddServer = { id, name, address ->
                                         scope.launch { serverViewModel.addServer(id, name, address) }
                                     },
@@ -161,6 +165,9 @@ fun AppRoute(app: NerveApp) {
                         nodeId = current.nodeId,
                         nodeName = current.nodeName,
                         onBack = { nav.back() },
+                        onOpenDm = { serverId, nodeId, nodeName ->
+                            nav.openChat(serverId, nodeId, nodeName)
+                        },
                     )
                 }
 

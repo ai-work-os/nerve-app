@@ -26,9 +26,11 @@ fun ChatScreen(
     streamingBlocks: List<ContentBlock> = emptyList(),
     canSend: Boolean = true,
     onSend: (String) -> Unit,
+    onPickImage: () -> Unit,
     onCancel: () -> Unit,
     onStop: (() -> Unit)? = null,
     onBack: (() -> Unit)? = null,
+    onOpenDm: ((String, String, String) -> Unit)? = null,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -63,6 +65,7 @@ fun ChatScreen(
                     isStreaming = state.isStreaming,
                     streamingText = streamingText,
                     streamingBlocks = streamingBlocks,
+                    onOpenDm = onOpenDm,
                 )
             }
             HorizontalDivider()
@@ -70,6 +73,7 @@ fun ChatScreen(
                 canSend = canSend,
                 isSending = state.isSending,
                 onSend = onSend,
+                onPickImage = onPickImage,
             )
         }
     }

@@ -3,6 +3,13 @@ package com.nerve.android.transport
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
+@Serializable
+data class SnapshotAction(
+    val type: String,
+    val nodeId: String? = null,
+    val nodeName: String? = null,
+)
+
 /**
  * Assembled DM message shipped in a [NerveEvent.MessageSnapshot]. Mirror of
  * the server-side `Message` type (nerve/src/protocol.ts).
@@ -15,6 +22,7 @@ data class SnapshotMessage(
     val sender: String,
     val text: String,
     val ts: Double,
+    val action: SnapshotAction? = null,
 )
 
 sealed interface NerveEvent {
@@ -67,6 +75,15 @@ sealed interface NerveEvent {
     data class NodeRegistered(
         val nodeId: String,
         val name: String?,
+    ) : NerveEvent
+
+    data class NodeSpawned(
+        val nodeId: String,
+        val name: String,
+        val adapter: String?,
+        val spawnedByNodeId: String,
+        val spawnedByNodeName: String,
+        val channelId: String?,
     ) : NerveEvent
 
     data class NodeStopped(

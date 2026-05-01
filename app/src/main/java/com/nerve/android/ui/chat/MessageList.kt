@@ -35,6 +35,7 @@ fun MessageList(
     streamingText: String,
     streamingBlocks: List<ContentBlock> = emptyList(),
     onAutoScroll: (() -> Unit)? = null,
+    onOpenDm: ((String, String, String) -> Unit)? = null,
 ) {
     val visibleMessages = remember(messages) {
         messages.mapNotNull { msg ->
@@ -69,7 +70,7 @@ fun MessageList(
             }
         }
         items(visibleMessages, key = { it.id }) { message ->
-            MessageBubble(message)
+            MessageBubble(message, onOpenDm = onOpenDm)
         }
         if (isStreaming) {
             if (streamingBlocks.isNotEmpty()) {
@@ -103,6 +104,7 @@ fun MessageList(
                                             nodeName = "",
                                         ),
                                         testTag = "streaming-bubble-assistant",
+                                        onOpenDm = onOpenDm,
                                     )
                                 }
                             }
@@ -121,6 +123,7 @@ fun MessageList(
                             nodeName = "",
                         ),
                         testTag = "streaming-bubble-assistant",
+                        onOpenDm = onOpenDm,
                     )
                 }
             } else {
