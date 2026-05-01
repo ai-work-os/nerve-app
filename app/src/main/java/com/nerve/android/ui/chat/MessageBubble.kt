@@ -111,9 +111,10 @@ fun MessageBubble(
 ) {
     val isUser = message.role == DmRole.USER
     val context = LocalContext.current
+    val visibleContent = message.textContent.ifBlank { message.content }
     val copyMessage = {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.setPrimaryClip(ClipData.newPlainText("message", message.content))
+        clipboard.setPrimaryClip(ClipData.newPlainText("message", visibleContent))
         Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
     }
     val background = when (message.role) {
@@ -131,54 +132,55 @@ fun MessageBubble(
             Spacer(modifier = Modifier.width(8.dp))
         }
         Column(modifier = Modifier.weight(1f, fill = false)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (message.role == DmRole.ASSISTANT && message.nodeName.isNotEmpty()) {
+            if (message.role == DmRole.ASSISTANT && message.nodeName.isNotEmpty()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         message.nodeName,
-                        modifier = Modifier.padding(start = 4.dp, bottom = 2.dp).weight(1f, fill = false),
+                        modifier = Modifier.padding(start = 4.dp, bottom = 2.dp),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                } else {
-                    Spacer(Modifier.weight(1f))
-                }
-                IconButton(
-                    onClick = copyMessage,
-                    modifier = Modifier.size(28.dp),
-                ) {
-                    Icon(
-                        Icons.Default.ContentCopy,
-                        contentDescription = "Copy message",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp),
-                    )
                 }
             }
-            Box(
-                modifier = Modifier
-                    .padding(vertical = 4.dp)
-                    .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
-                    .combinedClickable(
-                        onClick = {},
-                        onLongClick = copyMessage,
-                    )
-                    .background(background, RoundedCornerShape(16.dp))
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            Row(
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    val action = message.action
-                    if (action == null) {
-                        MarkdownText(message.content)
-                    } else {
-                        Text(message.content)
-                    }
-                    if (action is DmAction.OpenDm && onOpenDm != null) {
-                        Button(
-                            onClick = { onOpenDm(action.serverId, action.nodeId, action.nodeName) },
-                        ) {
-                            Text("进入私聊")
+                if (isUser) {
+                    CopyButton(onClick = copyMessage)
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+                Box(
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .padding(vertical = 4.dp)
+                        .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
+                        .combinedClickable(
+                            onClick = {},
+                            onLongClick = copyMessage,
+                        )
+                        .background(background, RoundedCornerShape(16.dp))
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        val action = message.action
+                        if (action == null) {
+                            MarkdownText(visibleContent)
+                        } else {
+                            Text(visibleContent)
+                        }
+                        if (action is DmAction.OpenDm && onOpenDm != null) {
+                            Button(
+                                onClick = { onOpenDm(action.serverId, action.nodeId, action.nodeName) },
+                            ) {
+                                Text("进入私聊")
+                            }
                         }
                     }
+                }
+                if (!isUser) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    CopyButton(onClick = copyMessage)
                 }
             }
         }
@@ -186,5 +188,22 @@ fun MessageBubble(
             Spacer(modifier = Modifier.width(8.dp))
             Avatar(label = "U", isUser = true)
         }
+    }
+}
+
+@Composable
+private fun CopyButton(onClick: () -> Unit) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier
+            .padding(top = 6.dp)
+            .size(28.dp),
+    ) {
+        Icon(
+            Icons.Default.ContentCopy,
+            contentDescription = "Copy message",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(16.dp),
+        )
     }
 }
