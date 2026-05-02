@@ -60,7 +60,11 @@ class DefaultChannelEventMapper : ChannelEventMapper {
             )
         val payloadId = payload.string("messageId") ?: payload.stringPath("message", "id")
         if (topLevelId != null && payloadId != null && topLevelId != payloadId) {
-            Logger.w("ChannelEventMapper", "channel id_conflict key=$channelId top=$topLevelId payload=$payloadId")
+            Logger.warn(
+                "ChannelEventMapper",
+                "channel_id_conflict",
+                mapOf("channelId" to channelId, "top" to topLevelId, "payload" to payloadId),
+            )
         }
         val id = topLevelId ?: payloadId ?: buildFallbackMessageId(channelId, timestamp, from, content)
         val message = ChannelMessage(
@@ -79,7 +83,7 @@ class DefaultChannelEventMapper : ChannelEventMapper {
     }
 
     private fun ignore(reason: String): ChannelMappedEvent.Ignore {
-        Logger.d("ChannelEventMapper", "channel ignore reason=$reason")
+        Logger.debug("ChannelEventMapper", "map_ignore", mapOf("reason" to reason))
         return ChannelMappedEvent.Ignore
     }
 }

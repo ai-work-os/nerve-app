@@ -1,28 +1,32 @@
 package com.nerve.android.util
 
 import android.content.Context
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.time.Instant
 
+enum class LogLevel { DEBUG, WARN, ERROR }
+
 interface LogBackend {
-    fun d(tag: String, message: String)
-    fun w(tag: String, message: String)
-    fun e(tag: String, message: String, throwable: Throwable? = null)
+    fun write(level: LogLevel, tag: String, line: String, throwable: Throwable? = null)
 }
 
 class AndroidLogBackend : LogBackend {
-    override fun d(tag: String, message: String) { android.util.Log.d(tag, message) }
-    override fun w(tag: String, message: String) { android.util.Log.w(tag, message) }
-    override fun e(tag: String, message: String, throwable: Throwable?) {
-        if (throwable != null) android.util.Log.e(tag, message, throwable)
-        else android.util.Log.e(tag, message)
+    override fun write(level: LogLevel, tag: String, line: String, throwable: Throwable?) {
+        when (level) {
+            LogLevel.DEBUG -> android.util.Log.d(tag, line)
+            LogLevel.WARN -> android.util.Log.w(tag, line)
+            LogLevel.ERROR -> {
+                if (throwable != null) android.util.Log.e(tag, line, throwable)
+                else android.util.Log.e(tag, line)
+            }
+        }
     }
 }
 
 class PrintlnLogBackend : LogBackend {
-    override fun d(tag: String, message: String) { println("D/$tag $message") }
-    override fun w(tag: String, message: String) { println("W/$tag $message") }
-    override fun e(tag: String, message: String, throwable: Throwable?) {
-        println("E/$tag $message")
+    override fun write(level: LogLevel, tag: String, line: String, throwable: Throwable?) {
+        println("${prefix(level)}/$tag $line")
         throwable?.printStackTrace()
     }
 }
@@ -34,15 +38,13 @@ class FileLogBackend(
 ) : LogBackend {
     private var currentFile: java.io.File = newLogFile()
 
-    override fun d(tag: String, message: String) = write("D/$tag $message")
-    override fun w(tag: String, message: String) = write("W/$tag $message")
-    override fun e(tag: String, message: String, throwable: Throwable?) {
-        write("E/$tag $message")
-        throwable?.let { write(it.stackTraceToString()) }
+    override fun write(level: LogLevel, tag: String, line: String, throwable: Throwable?) {
+        writeLine("${prefix(level)}/$tag $line")
+        throwable?.let { writeLine(it.stackTraceToString()) }
     }
 
     @Synchronized
-    private fun write(line: String) {
+    private fun writeLine(line: String) {
         currentFile.appendText("${Instant.now()} $line\n")
         if (currentFile.length() > maxFileSize) {
             currentFile = newLogFile()
@@ -66,17 +68,30 @@ class FileLogBackend(
 }
 
 class CompositeLogBackend(private val backends: List<LogBackend>) : LogBackend {
-    override fun d(tag: String, message: String) = backends.forEach { it.d(tag, message) }
-    override fun w(tag: String, message: String) = backends.forEach { it.w(tag, message) }
-    override fun e(tag: String, message: String, throwable: Throwable?) = backends.forEach { it.e(tag, message, throwable) }
+    override fun write(level: LogLevel, tag: String, line: String, throwable: Throwable?) {
+        backends.forEach { it.write(level, tag, line, throwable) }
+    }
 }
 
 object Logger {
     var backend: LogBackend = detectBackend()
 
-    fun d(tag: String, message: String) = backend.d(tag, message)
-    fun w(tag: String, message: String) = backend.w(tag, message)
-    fun e(tag: String, message: String, throwable: Throwable? = null) = backend.e(tag, message, throwable)
+    fun debug(tag: String, event: String, fields: Map<String, Any?> = emptyMap()) {
+        backend.write(LogLevel.DEBUG, tag, format(event, fields))
+    }
+
+    fun warn(tag: String, event: String, fields: Map<String, Any?> = emptyMap()) {
+        backend.write(LogLevel.WARN, tag, format(event, fields))
+    }
+
+    fun error(
+        tag: String,
+        event: String,
+        fields: Map<String, Any?> = emptyMap(),
+        throwable: Throwable? = null,
+    ) {
+        backend.write(LogLevel.ERROR, tag, format(event, fields), throwable)
+    }
 
     fun init(context: Context) {
         initFileLogging(java.io.File(context.filesDir, "logs"), AndroidLogBackend())
@@ -89,7 +104,11 @@ object Logger {
                 FileLogBackend(logsDir),
             ),
         )
-        d("Logger", "logger initialized fileLogging=true dir=${logsDir.absolutePath}")
+        debug(
+            "Logger",
+            "logger_initialized",
+            mapOf("fileLogging" to true, "dir" to logsDir.absolutePath),
+        )
     }
 
     fun detectBackend(): LogBackend = try {
@@ -100,4 +119,27 @@ object Logger {
     } catch (_: Throwable) {
         PrintlnLogBackend()
     }
+
+    private fun format(event: String, fields: Map<String, Any?>): String {
+        val parts = mutableListOf("event=$event")
+        fields.forEach { (key, value) ->
+            if (value != null) parts += "$key=${formatValue(value)}"
+        }
+        return parts.joinToString(" ")
+    }
+
+    private fun formatValue(value: Any): String {
+        if (value !is String) return value.toString()
+        return if (value.any { it.isWhitespace() || it == '"' || it == '\\' || it == '=' }) {
+            Json.encodeToString(value)
+        } else {
+            value
+        }
+    }
+}
+
+private fun prefix(level: LogLevel): String = when (level) {
+    LogLevel.DEBUG -> "D"
+    LogLevel.WARN -> "W"
+    LogLevel.ERROR -> "E"
 }

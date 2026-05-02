@@ -65,6 +65,7 @@ class RealServerRegistry(
         started = true
         this.registration = registration
         val configs = configStore.load()
+        Logger.debug("ServerRegistry", "registry_start", mapOf("serverCount" to configs.size))
         _servers.value = configs
         val jobs = configs.map { config ->
             scope.launch {
@@ -74,6 +75,7 @@ class RealServerRegistry(
         }
         jobs.forEach { it.join() }
         refresh()
+        Logger.debug("ServerRegistry", "registry_started", mapOf("serverCount" to configs.size))
     }
 
     override suspend fun refresh(serverId: String?) {
@@ -82,6 +84,11 @@ class RealServerRegistry(
         } else {
             _servers.value.filter { it.id == serverId }
         }
+        Logger.debug(
+            "ServerRegistry",
+            "refresh_begin",
+            mapOf("serverId" to serverId, "targetCount" to targetConfigs.size),
+        )
         for (config in targetConfigs) {
             val client = clients[config.id] ?: continue
             val refreshedNodes = runCatching { client.listNodes() }
@@ -89,23 +96,36 @@ class RealServerRegistry(
             refreshedNodes.onSuccess { nodeCache[config.id] = it }
                 .onFailure {
                     nodeCache.remove(config.id)
-                    Logger.w("ServerRegistry", "server refresh_failed id=${config.id}")
+                    Logger.warn(
+                        "ServerRegistry",
+                        "refresh_fail",
+                        mapOf("serverId" to config.id, "target" to "nodes", "reason" to it.message),
+                    )
                 }
             refreshedChannels.onSuccess { channelCache[config.id] = it }
                 .onFailure {
                     channelCache.remove(config.id)
-                    Logger.w("ServerRegistry", "server refresh_failed id=${config.id}")
+                    Logger.warn(
+                        "ServerRegistry",
+                        "refresh_fail",
+                        mapOf("serverId" to config.id, "target" to "channels", "reason" to it.message),
+                    )
                 }
-            Logger.d(
+            Logger.debug(
                 "ServerRegistry",
-                "server refresh id=${config.id} nodes=${nodeCache[config.id]?.size ?: 0} channels=${channelCache[config.id]?.size ?: 0}",
+                "refresh_success",
+                mapOf(
+                    "serverId" to config.id,
+                    "nodeCount" to nodeCache[config.id]?.size,
+                    "channelCount" to channelCache[config.id]?.size,
+                ),
             )
         }
         publishSnapshots()
     }
 
     override suspend fun addServer(config: ServerConfig) {
-        Logger.d("ServerRegistry", "server add id=${config.id} address=${config.address}")
+        Logger.debug("ServerRegistry", "server_add", mapOf("serverId" to config.id, "address" to config.address))
         configStore.upsert(config)
         _servers.value = _servers.value.filterNot { it.id == config.id } + config
         disconnectServer(config.id)
@@ -117,7 +137,7 @@ class RealServerRegistry(
     }
 
     override suspend fun removeServer(serverId: String) {
-        Logger.d("ServerRegistry", "server remove id=$serverId")
+        Logger.debug("ServerRegistry", "server_remove", mapOf("serverId" to serverId))
         disconnectServer(serverId)
         nodeCache.remove(serverId)
         channelCache.remove(serverId)
@@ -130,36 +150,42 @@ class RealServerRegistry(
     override suspend fun client(serverId: String): NerveClient? = clients[serverId]
 
     private suspend fun connectServer(config: ServerConfig, registration: ClientRegistration) {
-        Logger.d("ServerRegistry", "server client_create id=${config.id}")
+        Logger.debug("ServerRegistry", "client_create", mapOf("serverId" to config.id))
         val client = clientFactory.create(config.id)
         clients[config.id] = client
         connectionJobs[config.id] = scope.launch(start = CoroutineStart.UNDISPATCHED) {
             client.connectionState.collect { state ->
                 connectionCache[config.id] = state
-                Logger.d("ServerRegistry", "server state id=${config.id} state=$state")
+                Logger.debug("ServerRegistry", "state_change", mapOf("serverId" to config.id, "state" to state))
                 publishConnections()
             }
         }
         eventJobs[config.id] = scope.launch(start = CoroutineStart.UNDISPATCHED) {
             runCatching {
                 client.events.collect { event ->
-                    Logger.d("ServerRegistry", "server event id=${config.id} kind=${event::class.simpleName}")
+                    Logger.debug(
+                        "ServerRegistry",
+                        "event_forward",
+                        mapOf("serverId" to config.id, "eventType" to event::class.simpleName),
+                    )
                     _events.emit(ServerScopedEvent(config.id, event))
                 }
             }
         }
-        Logger.d("ServerRegistry", "server connect id=${config.id}")
+        Logger.debug("ServerRegistry", "connect_begin", mapOf("serverId" to config.id))
         client.connect(config, registration)
     }
 
     private suspend fun disconnectServer(serverId: String) {
+        Logger.debug("ServerRegistry", "disconnect_begin", mapOf("serverId" to serverId))
         connectionJobs.remove(serverId)?.cancel()
         eventJobs.remove(serverId)?.cancel()
         clients.remove(serverId)?.disconnect()
+        Logger.debug("ServerRegistry", "disconnect_success", mapOf("serverId" to serverId))
     }
 
     private fun handleConnectFailure(serverId: String, error: Throwable) {
-        Logger.w("ServerRegistry", "server connect_failed id=$serverId")
+        Logger.warn("ServerRegistry", "connect_fail", mapOf("serverId" to serverId, "reason" to error.message))
         connectionJobs.remove(serverId)?.cancel()
         eventJobs.remove(serverId)?.cancel()
         clients.remove(serverId)

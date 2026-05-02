@@ -55,7 +55,11 @@ class ChatViewModel(
                 runCatching {
                     serverRegistry.client(previousServerId)?.unsubscribe(previousNodeId)
                 }.onFailure {
-                    Logger.w("ChatViewModel", "chat unsubscribe failed nodeId=$previousNodeId error=${it.message}")
+                    Logger.warn(
+                        "ChatViewModel",
+                        "dm_unsubscribe_fail",
+                        mapOf("nodeId" to previousNodeId, "reason" to it.message),
+                    )
                 }
             }
             sessionManager.reset()
@@ -65,7 +69,7 @@ class ChatViewModel(
         streamingJob?.cancel()
         currentServerId = serverId
         currentNodeId = nodeId
-        Logger.d("ChatViewModel", "chat enter serverId=$serverId nodeId=$nodeId")
+        Logger.debug("ChatViewModel", "dm_enter", mapOf("serverId" to serverId, "nodeId" to nodeId))
         _uiState.value = _uiState.value.copy(
             serverId = serverId,
             nodeId = nodeId,
@@ -102,18 +106,20 @@ class ChatViewModel(
                     if (eventNodeId != nodeId) return@collect
                     when (event) {
                         is NerveEvent.MessageSnapshot -> {
-                            Logger.d(
+                            Logger.debug(
                                 "ChatViewModel",
-                                "snapshot received nodeId=$nodeId count=${event.messages.size}",
+                                "dm_snapshot_received",
+                                mapOf("nodeId" to nodeId, "count" to event.messages.size),
                             )
                             sessionManager.replaceHistory(
                                 event.messages.map { it.toDmMessage(serverId, event.name) },
                             )
                         }
                         is NerveEvent.NodeSpawned -> {
-                            Logger.d(
+                            Logger.debug(
                                 "ChatViewModel",
-                                "node spawned in dm parent=$nodeId child=${event.nodeId} name=${event.name}",
+                                "dm_node_spawned",
+                                mapOf("parentNodeId" to nodeId, "nodeId" to event.nodeId, "nodeName" to event.name),
                             )
                             sessionManager.addSystemMessage(
                                 DmMessage(
@@ -134,9 +140,13 @@ class ChatViewModel(
                         }
                         else -> {
                             val mapped = mapper.map(event)
-                            Logger.d(
+                            Logger.debug(
                                 "ChatViewModel",
-                                "event mapped: ${mapped::class.simpleName} from ${event::class.simpleName}",
+                                "dm_event_mapped",
+                                mapOf(
+                                    "mappedType" to mapped::class.simpleName,
+                                    "eventType" to event::class.simpleName,
+                                ),
                             )
                             if (mapped != DmMappedEvent.Ignore) {
                                 sessionManager.onEvent(mapped)
@@ -154,7 +164,7 @@ class ChatViewModel(
             }.onSuccess {
                 onSubscribed?.invoke(serverId, nodeId)
             }.onFailure {
-                Logger.w("ChatViewModel", "chat subscribe failed nodeId=$nodeId error=${it.message}")
+                Logger.warn("ChatViewModel", "dm_subscribe_fail", mapOf("nodeId" to nodeId, "reason" to it.message))
                 _uiState.value = _uiState.value.copy(errorMessage = it.message)
             }
         }
@@ -188,7 +198,7 @@ class ChatViewModel(
     fun leaveDm() {
         val serverId = currentServerId ?: return
         val nodeId = currentNodeId ?: return
-        Logger.d("ChatViewModel", "chat leave serverId=$serverId nodeId=$nodeId")
+        Logger.debug("ChatViewModel", "dm_leave", mapOf("serverId" to serverId, "nodeId" to nodeId))
         messageJob?.cancel()
         attachJob?.cancel()
         streamingJob?.cancel()
@@ -196,7 +206,7 @@ class ChatViewModel(
             runCatching {
                 serverRegistry.client(serverId)?.unsubscribe(nodeId)
             }.onFailure {
-                Logger.w("ChatViewModel", "chat unsubscribe failed nodeId=$nodeId error=${it.message}")
+                Logger.warn("ChatViewModel", "dm_unsubscribe_fail", mapOf("nodeId" to nodeId, "reason" to it.message))
             }
         }
         currentServerId = null
@@ -217,7 +227,11 @@ class ChatViewModel(
         val serverId = currentServerId ?: return
         val nodeId = currentNodeId ?: return
         val nodeName = _uiState.value.nodeName ?: nodeId
-        Logger.d("ChatViewModel", "chat send nodeId=$nodeId len=${text.length}")
+        Logger.debug(
+            "ChatViewModel",
+            "dm_send_begin",
+            mapOf("serverId" to serverId, "nodeId" to nodeId, "len" to text.length),
+        )
         _uiState.value = _uiState.value.copy(isSending = true, errorMessage = null)
         val userEvent = DmMappedEvent.UserMessage(
             nodeId = nodeId,
@@ -230,6 +244,11 @@ class ChatViewModel(
         runCatching {
             serverRegistry.client(serverId)?.prompt(nodeId, text)
         }.onFailure {
+            Logger.warn(
+                "ChatViewModel",
+                "dm_send_fail",
+                mapOf("serverId" to serverId, "nodeId" to nodeId, "reason" to it.message),
+            )
             _uiState.value = _uiState.value.copy(errorMessage = it.message)
         }
         _uiState.value = _uiState.value.copy(isSending = false)
@@ -241,7 +260,11 @@ class ChatViewModel(
         val nodeName = _uiState.value.nodeName ?: nodeId
         val text = caption.ifBlank { "Image" }
         val localText = "$text\n[image:$mimeType]"
-        Logger.d("ChatViewModel", "chat send image nodeId=$nodeId mime=$mimeType bytes=${base64Data.length}")
+        Logger.debug(
+            "ChatViewModel",
+            "dm_image_send_begin",
+            mapOf("serverId" to serverId, "nodeId" to nodeId, "mime" to mimeType, "bytes" to base64Data.length),
+        )
         _uiState.value = _uiState.value.copy(isSending = true, errorMessage = null)
         sessionManager.onEvent(
             DmMappedEvent.UserMessage(
@@ -259,6 +282,11 @@ class ChatViewModel(
                 PromptAttachment.Image(mimeType = mimeType, data = base64Data),
             )
         }.onFailure {
+            Logger.warn(
+                "ChatViewModel",
+                "dm_send_fail",
+                mapOf("serverId" to serverId, "nodeId" to nodeId, "reason" to it.message),
+            )
             _uiState.value = _uiState.value.copy(errorMessage = it.message)
         }
         _uiState.value = _uiState.value.copy(isSending = false)
@@ -275,7 +303,11 @@ class ChatViewModel(
             if (sessions.isEmpty()) return
             val latestSessionId = sessions.last()
                 .jsonObject["sessionId"]?.jsonPrimitive?.content ?: return
-            Logger.d("ChatViewModel", "chat session.load serverId=$serverId nodeId=$nodeId sessionId=$latestSessionId")
+            Logger.debug(
+                "ChatViewModel",
+                "session_load_begin",
+                mapOf("serverId" to serverId, "nodeId" to nodeId, "sessionId" to latestSessionId),
+            )
             client.call(
                 "session.load",
                 buildJsonObject {
@@ -284,7 +316,11 @@ class ChatViewModel(
                 },
             )
         }.onFailure {
-            Logger.w("ChatViewModel", "chat session load failed serverId=$serverId nodeId=$nodeId reason=${it.message}")
+            Logger.warn(
+                "ChatViewModel",
+                "session_load_fail",
+                mapOf("serverId" to serverId, "nodeId" to nodeId, "reason" to it.message),
+            )
         }
     }
 

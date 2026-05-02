@@ -29,7 +29,7 @@ class DmEventMapper {
             else -> DmMappedEvent.Ignore
         }
     } catch (e: Exception) {
-        Logger.w("DmEventMapper", "dm map error: ${e.message}")
+        Logger.warn("DmEventMapper", "map_error", mapOf("reason" to e.message))
         DmMappedEvent.Ignore
     }
 
@@ -168,7 +168,7 @@ class DmEventMapper {
     }
 
     private fun ignore(nodeId: String, reason: String): DmMappedEvent.Ignore {
-        Logger.d("DmEventMapper", "dm ignore key=$nodeId reason=$reason")
+        Logger.debug("DmEventMapper", "map_ignore", mapOf("nodeId" to nodeId, "reason" to reason))
         return DmMappedEvent.Ignore
     }
 }

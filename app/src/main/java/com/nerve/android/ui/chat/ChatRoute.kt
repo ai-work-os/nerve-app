@@ -35,19 +35,27 @@ fun ChatRoute(
         val mimeType = resolver.getType(uri) ?: "image/*"
         val bytes = resolver.openInputStream(uri)?.use { it.readBytes() } ?: return@rememberLauncherForActivityResult
         val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-        Logger.d("ChatRoute", "chat ui image selected key=$serverId:$nodeId mime=$mimeType bytes=${bytes.size}")
+        Logger.debug(
+            "ChatRoute",
+            "dm_image_selected",
+            mapOf("serverId" to serverId, "nodeId" to nodeId, "mime" to mimeType, "bytes" to bytes.size),
+        )
         scope.launch { viewModel.sendImage("", mimeType, base64) }
     }
 
     LaunchedEffect(serverId, nodeId, nodeName) {
-        Logger.d("ChatRoute", "chat route enter key=$serverId:$nodeId")
+        Logger.debug("ChatRoute", "route_enter", mapOf("serverId" to serverId, "nodeId" to nodeId, "route" to "dm"))
         onEnter?.invoke(serverId, nodeId)
         viewModel.enterDm(serverId, nodeId, nodeName)
     }
 
     DisposableEffect(serverId, nodeId) {
         onDispose {
-            Logger.d("ChatRoute", "chat route leave key=$serverId:$nodeId")
+            Logger.debug(
+                "ChatRoute",
+                "route_leave",
+                mapOf("serverId" to serverId, "nodeId" to nodeId, "route" to "dm"),
+            )
             viewModel.leaveDm()
         }
     }
@@ -57,16 +65,20 @@ fun ChatRoute(
         streamingText = state.streamingMessage?.content ?: "",
         streamingBlocks = state.streamingMessage?.blocks ?: emptyList(),
         onSend = { text ->
-            Logger.d("ChatRoute", "chat ui send key=$serverId:$nodeId len=${text.length}")
+            Logger.debug(
+                "ChatRoute",
+                "dm_send_begin",
+                mapOf("serverId" to serverId, "nodeId" to nodeId, "len" to text.length),
+            )
             scope.launch { viewModel.sendMessage(text) }
         },
         onPickImage = { imagePicker.launch("image/*") },
         onCancel = {
-            Logger.d("ChatRoute", "chat ui cancel key=$serverId:$nodeId")
+            Logger.debug("ChatRoute", "dm_cancel_begin", mapOf("serverId" to serverId, "nodeId" to nodeId))
             scope.launch { serverRegistry.client(serverId)?.cancelNode(nodeId) }
         },
         onStop = {
-            Logger.d("ChatRoute", "chat ui stop key=$serverId:$nodeId")
+            Logger.debug("ChatRoute", "dm_stop_begin", mapOf("serverId" to serverId, "nodeId" to nodeId))
             scope.launch { serverRegistry.client(serverId)?.stopNode(nodeId) }
         },
         onBack = onBack,

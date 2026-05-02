@@ -15,16 +15,16 @@ class SharedPrefsServerConfigStore(
         val initial = if (raw.isNullOrBlank()) {
             defaultConfigs().also {
                 saveAllSync(it)
-                Logger.d("ServerConfigStore", "server default_injected id=local")
+                Logger.debug("ServerConfigStore", "config_default_injected", mapOf("serverId" to "local"))
             }
         } else {
             runCatching {
                 json.decodeFromString(ListSerializer(ServerConfig.serializer()), raw)
             }.getOrElse {
-                Logger.e("ServerConfigStore", "server load_failed", it)
+                Logger.error("ServerConfigStore", "config_load_fail", mapOf("reason" to it.message), it)
                 defaultConfigs().also {
                     saveAllSync(it)
-                    Logger.d("ServerConfigStore", "server default_injected id=local")
+                    Logger.debug("ServerConfigStore", "config_default_injected", mapOf("serverId" to "local"))
                 }
             }
         }
@@ -34,12 +34,16 @@ class SharedPrefsServerConfigStore(
         val configs = if (missing.isNotEmpty()) {
             val merged = initial + missing
             saveAllSync(merged)
-            Logger.d("ServerConfigStore", "server default_appended ids=${missing.joinToString(",") { it.id }}")
+            Logger.debug(
+                "ServerConfigStore",
+                "config_default_appended",
+                mapOf("serverIds" to missing.joinToString(",") { config -> config.id }),
+            )
             merged
         } else {
             initial
         }
-        Logger.d("ServerConfigStore", "server load count=${configs.size}")
+        Logger.debug("ServerConfigStore", "config_load", mapOf("count" to configs.size))
         return configs
     }
 

@@ -24,7 +24,11 @@ class RealChannelEventProcessor(
 
     override suspend fun attach(serverId: String, events: Flow<NerveEvent>) {
         if (!activeServers.add(serverId)) {
-            Logger.w("ChannelEventProcessor", "channel ignore key=$serverId reason=duplicate_attach")
+            Logger.warn(
+                "ChannelEventProcessor",
+                "channel_attach_ignore",
+                mapOf("serverId" to serverId, "reason" to "duplicate_attach"),
+            )
             return
         }
         val context = currentCoroutineContext()
@@ -41,19 +45,19 @@ class RealChannelEventProcessor(
         when (val mapped = mapper.map(event)) {
             is ChannelMappedEvent.MessageReceived -> {
                 val key = ChannelKey("$serverId:${mapped.channelId}")
-                Logger.d("ChannelEventProcessor", "channel event key=${key.value} kind=message")
+                Logger.debug("ChannelEventProcessor", "channel_event", mapOf("key" to key.value, "kind" to "message"))
                 store.appendMessage(key, mapped.message)
             }
 
             is ChannelMappedEvent.MentionReceived -> {
                 val key = ChannelKey("$serverId:${mapped.channelId}")
-                Logger.d("ChannelEventProcessor", "channel event key=${key.value} kind=mention")
+                Logger.debug("ChannelEventProcessor", "channel_event", mapOf("key" to key.value, "kind" to "mention"))
                 store.appendMessage(key, mapped.message)
             }
 
             is ChannelMappedEvent.ChannelCreated -> {
                 val key = ChannelKey("$serverId:${mapped.channelId}")
-                Logger.d("ChannelEventProcessor", "channel event key=${key.value} kind=created")
+                Logger.debug("ChannelEventProcessor", "channel_event", mapOf("key" to key.value, "kind" to "created"))
                 val current = store.meta(key).value
                 store.upsertMeta(
                     key,
@@ -68,7 +72,7 @@ class RealChannelEventProcessor(
 
             is ChannelMappedEvent.ChannelClosed -> {
                 val key = ChannelKey("$serverId:${mapped.channelId}")
-                Logger.d("ChannelEventProcessor", "channel event key=${key.value} kind=closed")
+                Logger.debug("ChannelEventProcessor", "channel_event", mapOf("key" to key.value, "kind" to "closed"))
                 val current = store.meta(key).value
                 store.upsertMeta(
                     key,

@@ -86,6 +86,7 @@ class RealNerveClient(
         lastServer = server
         lastRegistration = registration
         manualDisconnect = false
+        Logger.debug("NerveClient", "connect_begin", mapOf("url" to resolveUrl(server)))
         val dispatcher =
             kotlinx.coroutines.currentCoroutineContext()[ContinuationInterceptor] as? CoroutineDispatcher
                 ?: Dispatchers.IO
@@ -93,9 +94,11 @@ class RealNerveClient(
         transitionTo(ConnectionState.CONNECTING)
         openAndRegister(server, registration)
         transitionTo(ConnectionState.CONNECTED)
+        Logger.debug("NerveClient", "connect_success", mapOf("url" to resolveUrl(server)))
     }
 
     override suspend fun disconnect() {
+        Logger.debug("NerveClient", "disconnect_begin")
         manualDisconnect = true
         reconnecting = false
         failPending(RpcException.TransportDisconnected())
@@ -103,6 +106,7 @@ class RealNerveClient(
         socket = null
         transitionTo(ConnectionState.DISCONNECTED)
         scope.cancel()
+        Logger.debug("NerveClient", "disconnect_success")
     }
 
     override suspend fun call(method: String, params: JsonObject): JsonElement {
@@ -128,13 +132,13 @@ class RealNerveClient(
         if (subscribedNodeIds.contains(nodeId)) return
         call("node.subscribe", buildJsonObject { put("nodeId", nodeId) })
         subscribedNodeIds += nodeId
-        Logger.d("NerveClient", "subscribe nodeId=$nodeId")
+        Logger.debug("NerveClient", "subscribe_success", mapOf("nodeId" to nodeId))
     }
 
     override suspend fun unsubscribe(nodeId: String) {
         call("node.unsubscribe", buildJsonObject { put("nodeId", nodeId) })
         subscribedNodeIds -= nodeId
-        Logger.d("NerveClient", "unsubscribe nodeId=$nodeId")
+        Logger.debug("NerveClient", "unsubscribe_success", mapOf("nodeId" to nodeId))
     }
 
     override suspend fun prompt(nodeId: String, content: String, attachment: PromptAttachment?): PromptResult {
@@ -188,9 +192,10 @@ class RealNerveClient(
 
     private suspend fun openAndRegister(server: ServerConfig, registration: ClientRegistration) {
         openSocket(resolveUrl(server))
-        Logger.d(
+        Logger.debug(
             "NerveClient",
-            "register name=${registration.name} capabilities=${registration.capabilities} permissions=${registration.permissions}",
+            "register_begin",
+            mapOf("name" to registration.name),
         )
         callInternal(
             "node.register",
@@ -205,13 +210,14 @@ class RealNerveClient(
                 put("permissions", registration.permissions)
             },
         )
+        Logger.debug("NerveClient", "register_success", mapOf("name" to registration.name))
     }
 
     private suspend fun openSocket(url: String) {
-        Logger.d("NerveClient", "connect server=$url")
         val opened = CompletableDeferred<ClientSocket>()
         val listener = object : ClientSocketListener {
             override fun onOpen() {
+                Logger.debug("NerveClient", "socket_open", mapOf("url" to url))
                 socket?.let(opened::complete)
             }
 
@@ -220,17 +226,17 @@ class RealNerveClient(
             }
 
             override fun onClosing(code: Int, reason: String) {
-                Logger.w("NerveClient", "socket failure reason=$reason")
+                Logger.warn("NerveClient", "socket_closing", mapOf("code" to code, "reason" to reason))
                 handleSocketLoss()
             }
 
             override fun onClosed(code: Int, reason: String) {
-                Logger.w("NerveClient", "socket failure reason=$reason")
+                Logger.warn("NerveClient", "socket_closed", mapOf("code" to code, "reason" to reason))
                 handleSocketLoss()
             }
 
             override fun onFailure(throwable: Throwable) {
-                Logger.e("NerveClient", "socket failure reason=${throwable.message}", throwable)
+                Logger.error("NerveClient", "socket_failure", mapOf("reason" to throwable.message), throwable)
                 if (!opened.isCompleted) opened.completeExceptionally(throwable)
                 handleSocketLoss()
             }
@@ -271,17 +277,31 @@ class RealNerveClient(
         val id = payload["id"]?.jsonPrimitive?.content?.toLongOrNull()
         when {
             method != null && id == null -> {
-                Logger.d("NerveClient", "notify method=$method")
+                Logger.debug("NerveClient", "notify_recv", mapOf("method" to method))
                 val params = payload["params"]?.jsonObject ?: buildJsonObject {}
-                RpcSerializer.parseNotification(method, params)?.let { eventFlow.tryEmit(it) }
+                val event = RpcSerializer.parseNotification(method, params)
+                if (event == null) {
+                    Logger.warn(
+                        "NerveClient",
+                        "notify_ignored",
+                        mapOf("method" to method, "reason" to "unmapped_notification"),
+                    )
+                } else {
+                    eventFlow.tryEmit(event)
+                }
             }
 
             else -> {
                 val response = RpcSerializer.decodeResponse(text)
                 val responseId = response.id ?: return
-                Logger.d("NerveClient", "rpc recv id=$responseId")
+                Logger.debug("NerveClient", "rpc_recv", mapOf("requestId" to responseId))
                 val deferred = pending.remove(responseId)
                 if (deferred == null) {
+                    Logger.debug(
+                        "NerveClient",
+                        "rpc_buffered",
+                        mapOf("requestId" to responseId, "reason" to "pending_not_found"),
+                    )
                     bufferedResponses[responseId] = response
                     return
                 }
@@ -312,28 +332,39 @@ class RealNerveClient(
         while (!manualDisconnect) {
             attempt += 1
             val delayMs = backoffStrategy.nextDelayMillis(attempt)
-            Logger.d("NerveClient", "reconnect attempt=$attempt delayMs=$delayMs")
+            Logger.debug("NerveClient", "reconnect_attempt", mapOf("attempt" to attempt, "delayMs" to delayMs))
             delay(delayMs)
-            val server = lastServer ?: break
-            val registration = lastRegistration ?: break
+            val server = lastServer
+            val registration = lastRegistration
+            if (server == null || registration == null) {
+                Logger.warn(
+                    "NerveClient",
+                    "reconnect_stop",
+                    mapOf("reason" to "missing_server_or_registration"),
+                )
+                break
+            }
             try {
                 openAndRegister(server, registration)
                 replaySubscriptions()
                 transitionTo(ConnectionState.CONNECTED)
+                Logger.debug("NerveClient", "reconnect_success", mapOf("attempt" to attempt))
                 reconnecting = false
                 return
-            } catch (_: Throwable) {
+            } catch (error: Throwable) {
+                Logger.warn("NerveClient", "reconnect_fail", mapOf("attempt" to attempt, "reason" to error.message))
             }
         }
         reconnecting = false
     }
 
     private suspend fun replaySubscriptions() {
-        Logger.d("NerveClient", "resubscribe count=${subscribedNodeIds.size}")
+        Logger.debug("NerveClient", "resubscribe_begin", mapOf("count" to subscribedNodeIds.size))
         subscribedNodeIds.forEach { nodeId ->
-            Logger.d("NerveClient", "resubscribe nodeId=$nodeId")
+            Logger.debug("NerveClient", "resubscribe_item", mapOf("nodeId" to nodeId))
             callInternal("node.subscribe", buildJsonObject { put("nodeId", nodeId) })
         }
+        Logger.debug("NerveClient", "resubscribe_success", mapOf("count" to subscribedNodeIds.size))
     }
 
     private suspend fun callInternal(method: String, params: JsonObject): JsonElement {
@@ -344,7 +375,7 @@ class RealNerveClient(
             pending[requestId] = deferred
             bufferedResponses.remove(requestId)?.let { completePending(deferred, it) }
             val request = RpcRequest(id = requestId, method = method, params = params)
-            Logger.d("NerveClient", "rpc send method=$method id=$requestId")
+            Logger.debug("NerveClient", "rpc_send", mapOf("method" to method, "requestId" to requestId))
             ws.send(RpcSerializer.encodeRequest(request))
             try {
                 withTimeout(requestTimeoutMs) {
@@ -352,7 +383,11 @@ class RealNerveClient(
                 }
             } catch (_: TimeoutCancellationException) {
                 pending.remove(requestId)
-                Logger.w("NerveClient", "rpc timeout id=$requestId method=$method")
+                Logger.warn(
+                    "NerveClient",
+                    "rpc_timeout",
+                    mapOf("method" to method, "requestId" to requestId, "reason" to "timeout"),
+                )
                 throw RpcException.RequestTimeout(method, requestId)
             }
         }
@@ -361,6 +396,7 @@ class RealNerveClient(
     private fun completePending(deferred: CompletableDeferred<JsonElement>, response: RpcResponse) {
         val error = response.error
         if (error != null) {
+            Logger.warn("NerveClient", "rpc_error", mapOf("code" to error.code, "reason" to error.message))
             deferred.completeExceptionally(RpcException.ServerError(error.code, error.message))
         } else {
             deferred.complete(response.result ?: buildJsonObject {})
@@ -377,7 +413,7 @@ class RealNerveClient(
     private fun transitionTo(next: ConnectionState) {
         val old = state.value
         if (old == next) return
-        Logger.d("NerveClient", "state old=$old new=$next")
+        Logger.debug("NerveClient", "state_change", mapOf("oldState" to old, "newState" to next))
         state.value = next
     }
 }
