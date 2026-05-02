@@ -24,41 +24,54 @@ class LoggerTest {
     }
 
     @Test
-    fun `d delegates to backend`() {
-        Logger.d("MyTag", "hello")
+    fun `debug formats event and fields`() {
+        Logger.debug("MyTag", "rpc_send", mapOf("method" to "node.prompt", "requestId" to 12L))
+
         assertEquals(1, spy.entries.size)
         val entry = spy.entries[0]
-        assertEquals("d", entry.level)
+        assertEquals(LogLevel.DEBUG, entry.level)
         assertEquals("MyTag", entry.tag)
-        assertEquals("hello", entry.message)
+        assertEquals("event=rpc_send method=node.prompt requestId=12", entry.line)
+        assertEquals(null, entry.throwable)
     }
 
     @Test
-    fun `w delegates to backend`() {
-        Logger.w("T", "warn msg")
-        val entry = spy.entries[0]
-        assertEquals("w", entry.level)
-        assertEquals("T", entry.tag)
-        assertEquals("warn msg", entry.message)
+    fun `warn omits null fields`() {
+        Logger.warn("T", "refresh_fail", mapOf("serverId" to "local", "reason" to null))
+
+        assertEquals("event=refresh_fail serverId=local", spy.entries[0].line)
     }
 
     @Test
-    fun `e delegates to backend with throwable`() {
+    fun `error passes throwable`() {
         val ex = RuntimeException("boom")
-        Logger.e("E", "error", ex)
+
+        Logger.error("E", "socket_failure", mapOf("reason" to ex.message), ex)
+
         val entry = spy.entries[0]
-        assertEquals("e", entry.level)
-        assertEquals("E", entry.tag)
-        assertEquals("error", entry.message)
+        assertEquals(LogLevel.ERROR, entry.level)
+        assertEquals("event=socket_failure reason=boom", entry.line)
         assertEquals(ex, entry.throwable)
     }
 
     @Test
-    fun `e delegates to backend without throwable`() {
-        Logger.e("E", "error")
-        val entry = spy.entries[0]
-        assertEquals("e", entry.level)
-        assertEquals(null, entry.throwable)
+    fun `strings needing escaping are JSON strings`() {
+        Logger.debug(
+            "Escape",
+            "field_escape",
+            mapOf(
+                "space" to "hello world",
+                "equals" to "a=b",
+                "newline" to "a\nb",
+                "quote" to "say \"hi\"",
+                "backslash" to "a\\b",
+            ),
+        )
+
+        assertEquals(
+            "event=field_escape space=\"hello world\" equals=\"a=b\" newline=\"a\\nb\" quote=\"say \\\"hi\\\"\" backslash=\"a\\\\b\"",
+            spy.entries[0].line,
+        )
     }
 
     @Test
@@ -68,8 +81,8 @@ class LoggerTest {
         System.setOut(java.io.PrintStream(baos))
         try {
             val backend = PrintlnLogBackend()
-            backend.d("tag", "message")
-            assertEquals("D/tag message\n", baos.toString())
+            backend.write(LogLevel.DEBUG, "tag", "event=test_event")
+            assertEquals("D/tag event=test_event\n", baos.toString())
         } finally {
             System.setOut(originalOut)
         }
@@ -77,7 +90,6 @@ class LoggerTest {
 
     @Test
     fun `detectBackend returns PrintlnLogBackend in test environment`() {
-        // Android unit test stubs throw RuntimeException, so detectBackend falls back
         val backend = Logger.detectBackend()
         assertTrue(backend is PrintlnLogBackend)
     }
@@ -87,26 +99,31 @@ class LoggerTest {
         val androidSpy = SpyLogBackend()
 
         Logger.initFileLogging(tempDir, androidSpy)
-        Logger.d("Init", "persist me")
+        Logger.debug("Init", "persist_test")
 
         assertEquals(2, androidSpy.entries.size)
-        assertEquals("logger initialized fileLogging=true dir=${tempDir.absolutePath}", androidSpy.entries[0].message)
-        assertEquals("persist me", androidSpy.entries[1].message)
+        assertEquals("event=logger_initialized fileLogging=true dir=${tempDir.absolutePath}", androidSpy.entries[0].line)
+        assertEquals("event=persist_test", androidSpy.entries[1].line)
 
         val content = tempDir.listFiles()?.filter { it.extension == "log" }
             ?.joinToString("\n") { it.readText() }
             .orEmpty()
-        assertTrue(content.contains("logger initialized fileLogging=true"), "file log should contain init line")
-        assertTrue(content.contains("D/Init persist me"), "file log should contain app log line")
+        assertTrue(content.contains("event=logger_initialized fileLogging=true"), "file log should contain init line")
+        assertTrue(content.contains("D/Init event=persist_test"), "file log should contain app log line")
     }
 
     private class SpyLogBackend : LogBackend {
-        data class Entry(val level: String, val tag: String, val message: String, val throwable: Throwable? = null)
+        data class Entry(
+            val level: LogLevel,
+            val tag: String,
+            val line: String,
+            val throwable: Throwable? = null,
+        )
         val entries = mutableListOf<Entry>()
 
-        override fun d(tag: String, message: String) { entries += Entry("d", tag, message) }
-        override fun w(tag: String, message: String) { entries += Entry("w", tag, message) }
-        override fun e(tag: String, message: String, throwable: Throwable?) { entries += Entry("e", tag, message, throwable) }
+        override fun write(level: LogLevel, tag: String, line: String, throwable: Throwable?) {
+            entries += Entry(level, tag, line, throwable)
+        }
     }
 }
 
@@ -118,29 +135,30 @@ class FileLogBackendTest {
     @Test
     fun `FileLogBackend writes log to file`() {
         val backend = FileLogBackend(logsDir = tempDir)
-        backend.d("MyTag", "hello world")
+        backend.write(LogLevel.DEBUG, "MyTag", "event=test_event message=\"hello world\"")
 
         val logFiles = tempDir.listFiles()?.filter { it.extension == "log" } ?: emptyList()
         assertTrue(logFiles.isNotEmpty(), "Expected at least one log file")
         val content = logFiles.first().readText()
         assertTrue(content.contains(Regex("""\d{4}-\d{2}-\d{2}T""")), "Log file should contain timestamp")
         assertTrue(content.contains("MyTag"), "Log file should contain tag")
-        assertTrue(content.contains("hello world"), "Log file should contain message")
+        assertTrue(content.contains("event=test_event message=\"hello world\""), "Log file should contain structured line")
     }
 
     @Test
     fun `FileLogBackend rotates when file exceeds limit`() {
-        val smallLimit = 50L // bytes
+        val smallLimit = 50L
         val backend = FileLogBackend(logsDir = tempDir, maxFileSize = smallLimit)
 
-        // Write enough to exceed the limit
         repeat(10) { i ->
-            backend.d("Tag", "message number $i with some padding text")
+            backend.write(LogLevel.DEBUG, "Tag", "event=test_event index=$i padding=\"some padding text\"")
         }
 
         val logFiles = tempDir.listFiles()?.filter { it.extension == "log" } ?: emptyList()
-        assertTrue(logFiles.size > 1,
-            "Expected multiple log files after rotation, got ${logFiles.size}")
+        assertTrue(
+            logFiles.size > 1,
+            "Expected multiple log files after rotation, got ${logFiles.size}",
+        )
     }
 
     @Test
@@ -149,14 +167,15 @@ class FileLogBackendTest {
         val maxFiles = 3
         val backend = FileLogBackend(logsDir = tempDir, maxFileSize = smallLimit, maxFiles = maxFiles)
 
-        // Write many entries to trigger multiple rotations
         repeat(50) { i ->
-            backend.d("Tag", "message $i with extra padding")
+            backend.write(LogLevel.DEBUG, "Tag", "event=test_event index=$i padding=\"extra padding\"")
         }
 
         val logFiles = tempDir.listFiles()?.filter { it.extension == "log" } ?: emptyList()
-        assertTrue(logFiles.size <= maxFiles,
-            "Expected at most $maxFiles log files, got ${logFiles.size}")
+        assertTrue(
+            logFiles.size <= maxFiles,
+            "Expected at most $maxFiles log files, got ${logFiles.size}",
+        )
     }
 
     @Test
@@ -165,20 +184,27 @@ class FileLogBackendTest {
         val spy2 = SpyBackend()
         val composite = CompositeLogBackend(listOf(spy1, spy2))
 
-        composite.d("T", "msg")
-        composite.w("T", "warn")
-        composite.e("T", "err")
+        composite.write(LogLevel.DEBUG, "T", "event=debug_event")
+        composite.write(LogLevel.WARN, "T", "event=warn_event")
+        composite.write(LogLevel.ERROR, "T", "event=error_event")
 
         assertEquals(3, spy1.calls.size, "spy1 should receive all 3 calls")
         assertEquals(3, spy2.calls.size, "spy2 should receive all 3 calls")
-        assertEquals(listOf("d", "w", "e"), spy1.calls.map { it.first })
-        assertEquals(listOf("d", "w", "e"), spy2.calls.map { it.first })
+        assertEquals(listOf(LogLevel.DEBUG, LogLevel.WARN, LogLevel.ERROR), spy1.calls.map { it.level })
+        assertEquals(listOf(LogLevel.DEBUG, LogLevel.WARN, LogLevel.ERROR), spy2.calls.map { it.level })
     }
 
     private class SpyBackend : LogBackend {
-        val calls = mutableListOf<Pair<String, String>>() // level to message
-        override fun d(tag: String, message: String) { calls += "d" to message }
-        override fun w(tag: String, message: String) { calls += "w" to message }
-        override fun e(tag: String, message: String, throwable: Throwable?) { calls += "e" to message }
+        data class Call(
+            val level: LogLevel,
+            val tag: String,
+            val line: String,
+            val throwable: Throwable?,
+        )
+        val calls = mutableListOf<Call>()
+
+        override fun write(level: LogLevel, tag: String, line: String, throwable: Throwable?) {
+            calls += Call(level, tag, line, throwable)
+        }
     }
 }
