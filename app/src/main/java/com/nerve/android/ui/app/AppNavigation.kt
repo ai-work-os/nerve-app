@@ -53,12 +53,21 @@ class AppNavigation {
     fun guardChat(servers: List<ServerConfig>, nodes: List<ServerNode>) {
         val current = screen
         if (current !is AppScreen.Chat) return
-        if (nodes.isEmpty()) return
         val serverExists = servers.any { it.id == current.serverId }
-        val nodeExists = nodes.any { it.serverId == current.serverId && it.node.id == current.nodeId }
-        if (!serverExists || !nodeExists) {
+        if (!serverExists) {
             back()
-            showError("Current chat target is unavailable")
+            showError("Current server is unavailable")
+            return
         }
+        val currentServerNodes = nodes.filter { it.serverId == current.serverId }
+        if (currentServerNodes.isEmpty()) return
+        val exactNode = currentServerNodes.firstOrNull { it.node.id == current.nodeId }
+        if (exactNode != null) return
+        val sameNameNode = currentServerNodes.firstOrNull { it.node.name == current.nodeName }
+        if (sameNameNode != null) {
+            screen = AppScreen.Chat(current.serverId, sameNameNode.node.id, sameNameNode.node.name)
+            return
+        }
+        back()
     }
 }

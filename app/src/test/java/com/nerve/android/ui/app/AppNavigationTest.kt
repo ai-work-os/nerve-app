@@ -99,7 +99,38 @@ class AppNavigationTest {
     }
 
     @Test
-    fun `guardChat navigates back when nodes loaded but target node missing`() {
+    fun `guardChat does not navigate back when only other server nodes are loaded`() {
+        val nav = AppNavigation()
+        nav.openChat("s1", "n1", "bot")
+        val servers = listOf(
+            ServerConfig("s1", "Home", "10.0.0.1:4800"),
+            ServerConfig("s2", "Test", "10.0.0.1:4801"),
+        )
+        val nodes = listOf(ServerNode("s2", "Test", NodeInfo("n2", "other-bot")))
+
+        nav.guardChat(servers, nodes)
+
+        assertIs<AppScreen.Chat>(nav.screen)
+        assertNull(nav.transientError)
+    }
+
+    @Test
+    fun `guardChat retargets when same node name has a new id`() {
+        val nav = AppNavigation()
+        nav.openChat("s1", "old-id", "bot")
+        val servers = listOf(ServerConfig("s1", "Home", "10.0.0.1:4800"))
+        val nodes = listOf(ServerNode("s1", "Home", NodeInfo("new-id", "bot")))
+
+        nav.guardChat(servers, nodes)
+
+        val screen = assertIs<AppScreen.Chat>(nav.screen)
+        assertEquals("new-id", screen.nodeId)
+        assertEquals("bot", screen.nodeName)
+        assertNull(nav.transientError)
+    }
+
+    @Test
+    fun `guardChat navigates back silently when nodes loaded but target node missing`() {
         val nav = AppNavigation()
         nav.openChat("s1", "n1", "bot")
         val servers = listOf(ServerConfig("s1", "Home", "10.0.0.1:4800"))
@@ -108,7 +139,18 @@ class AppNavigationTest {
         nav.guardChat(servers, nodes)
 
         assertIs<AppScreen.Main>(nav.screen)
-        assertEquals("Current chat target is unavailable", nav.transientError)
+        assertNull(nav.transientError)
+    }
+
+    @Test
+    fun `guardChat shows error when current server is removed`() {
+        val nav = AppNavigation()
+        nav.openChat("s1", "n1", "bot")
+
+        nav.guardChat(emptyList(), emptyList())
+
+        assertIs<AppScreen.Main>(nav.screen)
+        assertEquals("Current server is unavailable", nav.transientError)
     }
 
     @Test

@@ -12,6 +12,7 @@ import com.nerve.android.domain.server.FakeNerveClient
 import com.nerve.android.domain.server.ServerScopedEvent
 import com.nerve.android.presentation.FakeServerRegistry
 import com.nerve.android.transport.NerveEvent
+import com.nerve.android.transport.RpcException
 import com.nerve.android.transport.SnapshotAction
 import com.nerve.android.transport.SnapshotMessage
 import kotlinx.coroutines.Dispatchers
@@ -146,6 +147,39 @@ class ChatViewModelTest {
         assertEquals(listOf("n1"), client.unsubscribeCalls)
         assertFalse(vm.uiState.value.isStreaming)
         assertTrue(vm.uiState.value.messages.isEmpty())
+    }
+
+    @Test
+    fun `enter dm subscribe failure is shown without throwing`() = runTest {
+        val sessionManager = DmSessionManager()
+        val mapper = DmEventMapper()
+        val registry = FakeServerRegistry()
+        val client = FakeNerveClient()
+        client.subscribeResult = Result.failure(RpcException.ServerError(-32000, "node not found"))
+        registry.clients["s1"] = client
+        val vm = ChatViewModel(sessionManager, mapper, registry, Dispatchers.Unconfined)
+
+        vm.enterDm("s1", "missing", "bot")
+
+        assertEquals("node not found", vm.uiState.value.errorMessage)
+        assertEquals("missing", vm.uiState.value.nodeId)
+    }
+
+    @Test
+    fun `leave dm unsubscribe failure does not throw and still resets`() = runTest {
+        val sessionManager = DmSessionManager()
+        val mapper = DmEventMapper()
+        val registry = FakeServerRegistry()
+        val client = FakeNerveClient()
+        client.unsubscribeResult = Result.failure(RpcException.TransportDisconnected())
+        registry.clients["s1"] = client
+        val vm = ChatViewModel(sessionManager, mapper, registry, Dispatchers.Unconfined)
+
+        vm.enterDm("s1", "n1", "bot")
+        vm.leaveDm()
+
+        assertNull(vm.uiState.value.nodeId)
+        assertEquals(listOf("n1"), client.unsubscribeCalls)
     }
 
     @Test

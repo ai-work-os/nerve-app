@@ -52,7 +52,11 @@ class ChatViewModel(
         val previousNodeId = currentNodeId
         if (previousServerId != null && previousNodeId != null) {
             scope.launch(start = CoroutineStart.UNDISPATCHED) {
-                serverRegistry.client(previousServerId)?.unsubscribe(previousNodeId)
+                runCatching {
+                    serverRegistry.client(previousServerId)?.unsubscribe(previousNodeId)
+                }.onFailure {
+                    Logger.w("ChatViewModel", "chat unsubscribe failed nodeId=$previousNodeId error=${it.message}")
+                }
             }
             sessionManager.reset()
         }
@@ -145,8 +149,14 @@ class ChatViewModel(
         // immediately on subscribe (including reconnect resubscribe), which the
         // collector above will apply via replaceHistory.
         scope.launch {
-            serverRegistry.client(serverId)?.subscribe(nodeId)
-            onSubscribed?.invoke(serverId, nodeId)
+            runCatching {
+                serverRegistry.client(serverId)?.subscribe(nodeId)
+            }.onSuccess {
+                onSubscribed?.invoke(serverId, nodeId)
+            }.onFailure {
+                Logger.w("ChatViewModel", "chat subscribe failed nodeId=$nodeId error=${it.message}")
+                _uiState.value = _uiState.value.copy(errorMessage = it.message)
+            }
         }
     }
 
@@ -183,7 +193,11 @@ class ChatViewModel(
         attachJob?.cancel()
         streamingJob?.cancel()
         scope.launch(start = CoroutineStart.UNDISPATCHED) {
-            serverRegistry.client(serverId)?.unsubscribe(nodeId)
+            runCatching {
+                serverRegistry.client(serverId)?.unsubscribe(nodeId)
+            }.onFailure {
+                Logger.w("ChatViewModel", "chat unsubscribe failed nodeId=$nodeId error=${it.message}")
+            }
         }
         currentServerId = null
         currentNodeId = null
