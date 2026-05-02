@@ -213,15 +213,12 @@ class LoggerSourceUsageTest {
     @Test
     fun `production code does not use legacy logger API`() {
         val root = File("src/main/java")
+        val legacyCalls = listOf("d", "w", "e").map { "Logger.$it(" }
         val offenders = root.walkTopDown()
             .filter { it.isFile && it.extension == "kt" }
             .flatMap { file ->
                 file.readLines().mapIndexedNotNull { index, line ->
-                    if (
-                        line.contains("Logger.d(") ||
-                        line.contains("Logger.w(") ||
-                        line.contains("Logger.e(")
-                    ) {
+                    if (legacyCalls.any { line.contains(it) }) {
                         "${file.path}:${index + 1}: ${line.trim()}"
                     } else {
                         null
