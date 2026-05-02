@@ -208,3 +208,28 @@ class FileLogBackendTest {
         }
     }
 }
+
+class LoggerSourceUsageTest {
+    @Test
+    fun `production code does not use legacy logger API`() {
+        val root = File("src/main/java")
+        val offenders = root.walkTopDown()
+            .filter { it.isFile && it.extension == "kt" }
+            .flatMap { file ->
+                file.readLines().mapIndexedNotNull { index, line ->
+                    if (
+                        line.contains("Logger.d(") ||
+                        line.contains("Logger.w(") ||
+                        line.contains("Logger.e(")
+                    ) {
+                        "${file.path}:${index + 1}: ${line.trim()}"
+                    } else {
+                        null
+                    }
+                }
+            }
+            .toList()
+
+        assertTrue(offenders.isEmpty(), offenders.joinToString(separator = "\n"))
+    }
+}

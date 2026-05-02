@@ -35,7 +35,7 @@ fun ChatScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(state.errorMessage) {
-        Logger.d("ChatScreen", "chat ui error visible=${state.errorMessage != null}")
+        Logger.debug("ChatScreen", "screen_error_visible", mapOf("visible" to (state.errorMessage != null)))
         state.errorMessage?.let { snackbarHostState.showSnackbar(it) }
     }
 

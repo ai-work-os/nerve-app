@@ -50,7 +50,7 @@ fun MessageList(
     LaunchedEffect(visibleMessages.size, isStreaming, streamingText, streamingBlocks) {
         val extra = if (isStreaming) 1 else 0
         val target = (visibleMessages.size + extra - 1).coerceAtLeast(0)
-        Logger.d("ChatScreen", "chat ui scroll bottom count=${visibleMessages.size + extra}")
+        Logger.debug("ChatScreen", "scroll_bottom", mapOf("count" to visibleMessages.size + extra))
         onAutoScroll?.invoke()
         listState.animateScrollToItem(target)
     }

@@ -62,7 +62,7 @@ class ChannelsViewModel(
         messagesJob?.cancel()
         metaJob?.cancel()
         val key = ChannelKey("$serverId:$channelId")
-        Logger.d("ChannelsViewModel", "channels enter key=${key.value}")
+        Logger.debug("ChannelsViewModel", "channel_enter", mapOf("key" to key.value))
         _uiState.value = _uiState.value.copy(
             currentServerId = serverId,
             currentChannelId = channelId,
@@ -85,7 +85,7 @@ class ChannelsViewModel(
     }
 
     suspend fun joinChannel(serverId: String, channelId: String) {
-        Logger.d("ChannelsViewModel", "channels join key=$serverId:$channelId")
+        Logger.debug("ChannelsViewModel", "channel_join", mapOf("serverId" to serverId, "channelId" to channelId))
         _uiState.value = _uiState.value.copy(isJoining = true, errorMessage = null)
         runCatching {
             serverRegistry.client(serverId)?.call(
@@ -103,7 +103,11 @@ class ChannelsViewModel(
         if (text.isBlank()) return
         val serverId = _uiState.value.currentServerId ?: return
         val channelId = _uiState.value.currentChannelId ?: return
-        Logger.d("ChannelsViewModel", "channels post key=$serverId:$channelId len=${text.length}")
+        Logger.debug(
+            "ChannelsViewModel",
+            "channel_post_begin",
+            mapOf("serverId" to serverId, "channelId" to channelId, "len" to text.length),
+        )
         _uiState.value = _uiState.value.copy(isPosting = true, errorMessage = null)
         runCatching {
             serverRegistry.client(serverId)?.call(
@@ -138,9 +142,9 @@ class ChannelsViewModel(
                 )
                 channelStore.appendMessage(key, msg)
             }
-            Logger.d("ChannelsViewModel", "channels history key=${key.value} count=${messages.size}")
+            Logger.debug("ChannelsViewModel", "channel_history_loaded", mapOf("key" to key.value, "count" to messages.size))
         }.onFailure {
-            Logger.w("ChannelsViewModel", "channels history failed key=${key.value} reason=${it.message}")
+            Logger.warn("ChannelsViewModel", "channel_history_fail", mapOf("key" to key.value, "reason" to it.message))
         }
     }
 

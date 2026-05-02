@@ -29,14 +29,15 @@ class InMemoryChannelStore : ChannelStore {
         synchronized(lockFor(key)) {
             val ids = seenIds.getOrPut(key) { LinkedHashSet() }
             if (!ids.add(message.id)) {
-                Logger.d("ChannelStore", "channel dedup key=${key.value} id=${message.id}")
+                Logger.debug("ChannelStore", "channel_dedup", mapOf("key" to key.value, "messageId" to message.id))
                 return false
             }
             val flow = messageFlowFor(key)
             flow.value = flow.value + message
-            Logger.d(
+            Logger.debug(
                 "ChannelStore",
-                "channel append key=${key.value} id=${message.id} from=${message.from} ts=${message.timestamp}",
+                "channel_message_add",
+                mapOf("key" to key.value, "messageId" to message.id, "count" to flow.value.size),
             )
             return true
         }
@@ -45,7 +46,11 @@ class InMemoryChannelStore : ChannelStore {
     override fun upsertMeta(key: ChannelKey, meta: ChannelMeta) {
         synchronized(lockFor(key)) {
             metaFlowFor(key).value = meta
-            Logger.d("ChannelStore", "channel meta key=${key.value} name=${meta.name} closed=${meta.isClosed}")
+            Logger.debug(
+                "ChannelStore",
+                "channel_meta_update",
+                mapOf("key" to key.value, "name" to meta.name, "closed" to meta.isClosed),
+            )
         }
     }
 

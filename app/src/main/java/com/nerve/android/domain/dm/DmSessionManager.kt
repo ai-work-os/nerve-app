@@ -32,26 +32,30 @@ class DmSessionManager {
             is DmMappedEvent.AgentMessageEnd -> handleEnd(event)
             is DmMappedEvent.UserMessage -> handleUserMessage(event)
             is DmMappedEvent.NodeIdle -> handleIdle(event)
-            else -> Logger.w("DmSessionManager", "unhandled event: ${event::class.simpleName}")
+            else -> Logger.warn(
+                "DmSessionManager",
+                "unhandled_event",
+                mapOf("eventType" to event::class.simpleName, "reason" to "unsupported_event"),
+            )
         }
     }
 
     fun beginBatch() {
-        Logger.d("DmSessionManager", "batch begin")
+        Logger.debug("DmSessionManager", "batch_begin")
         batchMode = true
         pendingMessages = mutableListOf()
     }
 
     fun endBatch() {
         val pending = pendingMessages ?: return
-        Logger.d("DmSessionManager", "batch end, flushing ${pending.size} messages")
+        Logger.debug("DmSessionManager", "batch_end", mapOf("count" to pending.size))
         batchMode = false
         pendingMessages = null
         _messages.value = _messages.value + pending
     }
 
     fun reset() {
-        Logger.d("DmSessionManager", "session reset, cleared ${_messages.value.size} messages")
+        Logger.debug("DmSessionManager", "session_reset", mapOf("count" to _messages.value.size))
         state = null
         _messages.value = emptyList()
         _streamingMessage.value = null
@@ -64,7 +68,7 @@ class DmSessionManager {
      * Safe to call in or out of a batch; pending batch messages are discarded.
      */
     fun replaceHistory(messages: List<DmMessage>) {
-        Logger.d("DmSessionManager", "replaceHistory count=${messages.size}")
+        Logger.debug("DmSessionManager", "history_replace", mapOf("count" to messages.size))
         state = null
         pendingMessages = null
         batchMode = false
@@ -73,14 +77,22 @@ class DmSessionManager {
     }
 
     fun addSystemMessage(message: DmMessage) {
-        Logger.d("DmSessionManager", "system message id=${message.id} action=${message.action != null}")
+        Logger.debug(
+            "DmSessionManager",
+            "system_message_add",
+            mapOf("messageId" to message.id, "hasAction" to (message.action != null)),
+        )
         addMessage(message)
     }
 
     // --- internals ---
 
     private fun handleStart(event: DmMappedEvent.AgentMessageStart) {
-        Logger.d("DmSessionManager", "stream start msgId=${event.messageId} nodeId=${event.nodeId}")
+        Logger.debug(
+            "DmSessionManager",
+            "stream_start",
+            mapOf("messageId" to event.messageId, "nodeId" to event.nodeId),
+        )
         state = DmStreamingState(
             messageId = event.messageId,
             nodeId = event.nodeId,
@@ -98,14 +110,14 @@ class DmSessionManager {
             startedAt = timestamp,
             lastEventAt = timestamp,
         ).also {
-            Logger.d("DmSessionManager", "stream implicit-start nodeId=$nodeId")
+            Logger.debug("DmSessionManager", "stream_implicit_start", mapOf("nodeId" to nodeId))
             state = it
         }
     }
 
     private fun handleChunk(event: DmMappedEvent.AgentMessageChunk) {
         val s = ensureState(event.nodeId, event.timestamp)
-        Logger.d("DmSessionManager", "stream chunk len=${event.text.length}")
+        Logger.debug("DmSessionManager", "stream_chunk", mapOf("len" to event.text.length))
         s.text.append(event.text)
         s.lastEventAt = event.timestamp
         val last = s.blocks.lastOrNull()
@@ -143,7 +155,7 @@ class DmSessionManager {
     private fun handleEnd(event: DmMappedEvent.AgentMessageEnd) {
         val s = state
         if (s != null) {
-            Logger.d("DmSessionManager", "stream end msgId=${s.messageId}")
+            Logger.debug("DmSessionManager", "stream_end", mapOf("messageId" to s.messageId))
             state = null
             if (!batchMode) _streamingMessage.value = null
             s.lastEventAt = event.timestamp
@@ -153,10 +165,14 @@ class DmSessionManager {
         } else {
             val text = event.fallbackText?.trim().orEmpty()
             if (text.isBlank()) {
-                Logger.w("DmSessionManager", "end without active stream and no fallback")
+                Logger.warn(
+                    "DmSessionManager",
+                    "stream_end_without_active",
+                    mapOf("reason" to "no_active_stream_no_fallback"),
+                )
                 return
             }
-            Logger.d("DmSessionManager", "stream end (replay) nodeId=${event.nodeId}")
+            Logger.debug("DmSessionManager", "stream_end", mapOf("nodeId" to event.nodeId))
             val msg = DmMessage(
                 id = buildAssistantMessageId(event.nodeId, event.timestamp, text),
                 role = DmRole.ASSISTANT,
@@ -189,7 +205,7 @@ class DmSessionManager {
 
     private fun flushStreaming(reason: FlushReason, timestamp: Long) {
         val s = state ?: return
-        Logger.d("DmSessionManager", "stream flush reason=$reason")
+        Logger.debug("DmSessionManager", "stream_flush", mapOf("reason" to reason))
         state = null
         if (!batchMode) _streamingMessage.value = null
         val content = s.text.toString().trim()

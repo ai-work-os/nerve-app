@@ -36,7 +36,7 @@ class ServerViewModel(
     }
 
     suspend fun addServer(id: String, name: String, address: String) {
-        Logger.d("ServerViewModel", "server vm add id=$id address=$address")
+        Logger.debug("ServerViewModel", "server_add_begin", mapOf("serverId" to id, "address" to address))
         _uiState.value = _uiState.value.copy(isSubmitting = true, errorMessage = null)
         runCatching {
             serverRegistry.addServer(ServerConfig(id, name, address))
@@ -47,13 +47,13 @@ class ServerViewModel(
     }
 
     suspend fun removeServer(serverId: String) {
-        Logger.d("ServerViewModel", "server vm remove id=$serverId")
+        Logger.debug("ServerViewModel", "server_remove_begin", mapOf("serverId" to serverId))
         runCatching { serverRegistry.removeServer(serverId) }
             .onFailure { _uiState.value = _uiState.value.copy(errorMessage = it.message) }
     }
 
     suspend fun refresh() {
-        Logger.d("ServerViewModel", "server vm refresh")
+        Logger.debug("ServerViewModel", "server_refresh_begin")
         _uiState.value = _uiState.value.copy(isRefreshing = true, errorMessage = null)
         runCatching { serverRegistry.refresh() }
             .onFailure { _uiState.value = _uiState.value.copy(errorMessage = it.message) }
@@ -61,7 +61,7 @@ class ServerViewModel(
     }
 
     suspend fun refreshServer(serverId: String) {
-        Logger.d("ServerViewModel", "server vm refresh id=$serverId")
+        Logger.debug("ServerViewModel", "server_refresh_begin", mapOf("serverId" to serverId))
         _uiState.value = _uiState.value.copy(isRefreshing = true, errorMessage = null)
         runCatching { serverRegistry.refresh(serverId) }
             .onFailure { _uiState.value = _uiState.value.copy(errorMessage = it.message) }

@@ -58,7 +58,7 @@ class NodesViewModel(
     }
 
     suspend fun spawnNode(serverId: String, adapter: String, name: String?, cwd: String?) {
-        Logger.d("NodesViewModel", "nodes spawn serverId=$serverId adapter=$adapter")
+        Logger.debug("NodesViewModel", "node_spawn_begin", mapOf("serverId" to serverId, "adapter" to adapter))
         runCatching {
             serverRegistry.client(serverId)?.spawnNode(adapter, name, cwd)
             serverRegistry.refresh(serverId)
@@ -68,7 +68,7 @@ class NodesViewModel(
     }
 
     suspend fun stopNode(serverId: String, nodeId: String) {
-        Logger.d("NodesViewModel", "nodes stop serverId=$serverId nodeId=$nodeId")
+        Logger.debug("NodesViewModel", "node_stop_begin", mapOf("serverId" to serverId, "nodeId" to nodeId))
         runCatching {
             serverRegistry.client(serverId)?.stopNode(nodeId)
             serverRegistry.refresh(serverId)

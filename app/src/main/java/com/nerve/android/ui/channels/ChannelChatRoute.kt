@@ -22,7 +22,11 @@ fun ChannelChatRoute(
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(serverId, channelId) {
-        Logger.d("ChannelChatRoute", "channel enter key=$serverId:$channelId")
+        Logger.debug(
+            "ChannelChatRoute",
+            "route_enter",
+            mapOf("serverId" to serverId, "channelId" to channelId, "route" to "channel"),
+        )
         viewModel.enterChannel(serverId, channelId, channelName)
         viewModel.joinChannel(serverId, channelId)
     }
@@ -34,7 +38,11 @@ fun ChannelChatRoute(
         isPosting = state.isPosting,
         errorMessage = state.errorMessage,
         onSend = { text ->
-            Logger.d("ChannelChatRoute", "channel send key=$serverId:$channelId len=${text.length}")
+            Logger.debug(
+                "ChannelChatRoute",
+                "channel_post_begin",
+                mapOf("serverId" to serverId, "channelId" to channelId, "len" to text.length),
+            )
             scope.launch { viewModel.sendMessage(text) }
         },
         onBack = onBack,
