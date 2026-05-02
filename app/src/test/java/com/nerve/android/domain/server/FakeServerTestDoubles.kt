@@ -43,6 +43,8 @@ class FakeNerveClient : NerveClient {
     var listChannelsCalls = 0
     var callResult: Result<JsonElement> = Result.success(buildJsonObject {})
     val callResults: MutableMap<String, Result<JsonElement>> = mutableMapOf()
+    var subscribeResult: Result<Unit> = Result.success(Unit)
+    var unsubscribeResult: Result<Unit> = Result.success(Unit)
     var promptResult: Result<PromptResult> = Result.success(PromptResult(stopReason = "stop"))
     var spawnResult: Result<SpawnResult> = Result.success(SpawnResult(nodeId = "n1"))
     var stopResult: Result<Unit> = Result.success(Unit)
@@ -77,10 +79,12 @@ class FakeNerveClient : NerveClient {
 
     override suspend fun subscribe(nodeId: String) {
         subscribeCalls += nodeId
+        subscribeResult.getOrThrow()
     }
 
     override suspend fun unsubscribe(nodeId: String) {
         unsubscribeCalls += nodeId
+        unsubscribeResult.getOrThrow()
     }
 
     override suspend fun prompt(nodeId: String, content: String, attachment: PromptAttachment?): PromptResult {

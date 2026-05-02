@@ -84,7 +84,7 @@ class AppRouteTest {
         }
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithText("Current chat target is unavailable").assertIsDisplayed()
+        composeRule.onNodeWithText("Current server is unavailable").assertIsDisplayed()
         composeRule.onNodeWithText("No nodes yet").assertIsDisplayed()
     }
 
@@ -103,9 +103,9 @@ class AppRouteTest {
         }
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithText("Current chat target is unavailable").assertIsDisplayed()
+        composeRule.onNodeWithText("Current server is unavailable").assertIsDisplayed()
         composeRule.onNodeWithText("Close").performClick()
-        composeRule.onAllNodesWithText("Current chat target is unavailable").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Current server is unavailable").assertCountEquals(0)
     }
 
     private fun prepareApp(): Pair<NerveApp, RealServerRegistry> {
