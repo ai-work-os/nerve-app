@@ -19,9 +19,13 @@ import com.nerve.android.update.HttpVersionFetcher
 import com.nerve.android.update.UpdateChecker
 import com.nerve.android.update.UpdateViewModel
 import com.nerve.android.util.Logger
+import com.nerve.android.util.RemoteLogBackend
+import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 
 data class ResolvedDmEntry(
@@ -34,6 +38,9 @@ data class ResolvedDmEntry(
 }
 
 internal const val APP_VERSION_URL = "http://100.75.43.90/nerve-app-version.json"
+internal const val REMOTE_LOG_URL = "http://100.75.43.90:4811/log"
+private const val DEVICE_ID_PREFS = "nerve-device"
+private const val DEVICE_ID_KEY = "deviceId"
 
 class NerveApp : Application() {
     lateinit var configStore: ServerConfigStore
@@ -62,6 +69,7 @@ class NerveApp : Application() {
     override fun onCreate() {
         super.onCreate()
         Logger.init(this)
+        attachRemoteLogBackend()
         configStore = SharedPrefsServerConfigStore(
             getSharedPreferences(SharedPrefsServerConfigStore.PREFS_NAME, MODE_PRIVATE),
         )
@@ -150,6 +158,24 @@ class NerveApp : Application() {
     fun debugResolvedEntryKey(): String? = resolvedEntry?.key
 
     fun debugAvailableEntryKeys(): List<String> = availableEntryKeys
+
+    private fun attachRemoteLogBackend() {
+        val prefs = getSharedPreferences(DEVICE_ID_PREFS, MODE_PRIVATE)
+        val deviceId = prefs.getString(DEVICE_ID_KEY, null) ?: run {
+            val fresh = UUID.randomUUID().toString()
+            prefs.edit().putString(DEVICE_ID_KEY, fresh).apply()
+            fresh
+        }
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        Logger.addBackend(
+            RemoteLogBackend(
+                endpointUrl = REMOTE_LOG_URL,
+                deviceIdProvider = { deviceId },
+                versionCodeProvider = { BuildConfig.VERSION_CODE },
+                scope = scope,
+            ),
+        )
+    }
 
     private suspend fun resolveEntry() {
         val nodes = serverRegistry.nodes.first()
