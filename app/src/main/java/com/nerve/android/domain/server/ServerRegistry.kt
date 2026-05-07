@@ -31,6 +31,7 @@ interface ServerRegistry {
     suspend fun addServer(config: ServerConfig)
     suspend fun removeServer(serverId: String)
     suspend fun client(serverId: String): NerveClient?
+    fun triggerReconnectAll()
 }
 
 class RealServerRegistry(
@@ -148,6 +149,15 @@ class RealServerRegistry(
     }
 
     override suspend fun client(serverId: String): NerveClient? = clients[serverId]
+
+    override fun triggerReconnectAll() {
+        Logger.debug(
+            "ServerRegistry",
+            "trigger_reconnect_all",
+            mapOf("clientCount" to clients.size),
+        )
+        clients.values.forEach { it.triggerReconnect() }
+    }
 
     private suspend fun connectServer(config: ServerConfig, registration: ClientRegistration) {
         Logger.debug("ServerRegistry", "client_create", mapOf("serverId" to config.id))

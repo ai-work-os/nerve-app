@@ -19,6 +19,7 @@ import com.nerve.android.update.HttpVersionFetcher
 import com.nerve.android.update.UpdateChecker
 import com.nerve.android.update.UpdateViewModel
 import com.nerve.android.util.Logger
+import com.nerve.android.util.NetworkObserver
 import com.nerve.android.util.RemoteLogBackend
 import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
@@ -66,6 +67,8 @@ class NerveApp : Application() {
     @Volatile
     private var availableEntryKeys: List<String> = emptyList()
 
+    private var networkObserver: NetworkObserver? = null
+
     override fun onCreate() {
         super.onCreate()
         Logger.init(this)
@@ -85,6 +88,9 @@ class NerveApp : Application() {
             },
             scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO),
         )
+        networkObserver = NetworkObserver(this) {
+            serverRegistry.triggerReconnectAll()
+        }.also { it.register() }
     }
 
     fun createChatViewModel(): ChatViewModel =

@@ -72,6 +72,9 @@ class RealNerveClient(
     private val bufferedResponses = ConcurrentHashMap<Long, RpcResponse>()
     private val subscribedNodeIds = linkedSetOf<String>()
     private val reconnectMutex = Mutex()
+    private val reconnectWake = kotlinx.coroutines.channels.Channel<Unit>(
+        capacity = kotlinx.coroutines.channels.Channel.CONFLATED,
+    )
 
     private var scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var lastServer: ServerConfig? = null
@@ -328,13 +331,23 @@ class RealNerveClient(
         }
     }
 
+    override fun triggerReconnect() {
+        reconnectWake.trySend(Unit)
+    }
+
     private suspend fun runReconnectLoop() {
         var attempt = 0
         while (!manualDisconnect) {
             attempt += 1
             val delayMs = backoffStrategy.nextDelayMillis(attempt)
             Logger.debug("NerveClient", "reconnect_attempt", mapOf("attempt" to attempt, "delayMs" to delayMs))
-            delay(delayMs)
+            // Wait either for the backoff or an external wake signal (e.g. network becomes available)
+            val woke = kotlinx.coroutines.withTimeoutOrNull(delayMs) {
+                reconnectWake.receive()
+            }
+            if (woke != null) {
+                Logger.debug("NerveClient", "reconnect_wake", mapOf("attempt" to attempt))
+            }
             val server = lastServer
             val registration = lastRegistration
             if (server == null || registration == null) {

@@ -123,6 +123,31 @@ class ServerRegistryTest {
         assertEquals(listOf(ConnectionState.CONNECTED), registry.connections.value.map { it.state })
         assertEquals(listOf("n9"), registry.nodes.value.map { it.node.id })
     }
+
+    @Test
+    fun `triggerReconnectAll wakes every connected client`() = runTest {
+        val store = FakeServerConfigStore(
+            listOf(
+                ServerConfig("s1", "Home", "10.0.0.1:4800"),
+                ServerConfig("s2", "Lab", "10.0.0.2:4800"),
+            ),
+        )
+        val clientA = FakeNerveClient()
+        val clientB = FakeNerveClient()
+        val factory = FakeNerveClientFactory(
+            mutableMapOf(
+                "s1" to ArrayDeque(listOf(clientA)),
+                "s2" to ArrayDeque(listOf(clientB)),
+            ),
+        )
+        val registry = RealServerRegistry(store, factory, CoroutineScope(SupervisorJob() + Dispatchers.Unconfined))
+        registry.start(ClientRegistration(name = "android-ui"))
+
+        registry.triggerReconnectAll()
+
+        assertEquals(1, clientA.triggerReconnectCalls)
+        assertEquals(1, clientB.triggerReconnectCalls)
+    }
 }
 
 internal class FakeServerConfigStore(
