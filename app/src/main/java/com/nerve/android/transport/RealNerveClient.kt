@@ -57,6 +57,7 @@ class RealNerveClient(
     private val requestTimeoutMs: Long = 120_000,
     private val backoffStrategy: BackoffStrategy = ExponentialBackoffStrategy(),
     private val okHttpClient: OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
         .readTimeout(0, java.util.concurrent.TimeUnit.MILLISECONDS)
         .pingInterval(15, java.util.concurrent.TimeUnit.SECONDS)
         .build(),

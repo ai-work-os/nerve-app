@@ -66,7 +66,7 @@ fun AppRoute(app: NerveApp) {
     var darkTheme by remember { mutableStateOf(systemDark) }
     val context = LocalContext.current
 
-    LaunchedEffect(updateViewModel) {
+    LaunchedEffect(Unit) {
         updateViewModel.refresh()
     }
 
