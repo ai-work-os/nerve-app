@@ -33,6 +33,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.ui.platform.LocalContext
 import com.nerve.android.NerveApp
 import com.nerve.android.ui.channels.ChannelChatRoute
 import com.nerve.android.ui.channels.ChannelsRoute
@@ -40,6 +43,7 @@ import com.nerve.android.ui.chat.ChatRoute
 import com.nerve.android.ui.nodes.NodesRoute
 import com.nerve.android.ui.server.ServersScreen
 import com.nerve.android.ui.theme.NerveTheme
+import com.nerve.android.update.UpdateState
 import kotlinx.coroutines.launch
 
 @Composable
@@ -48,14 +52,22 @@ fun AppRoute(app: NerveApp) {
     val serverViewModel = remember(app) { app.createServerViewModel() }
     val chatViewModel = remember(app) { app.createChatViewModel() }
     val channelsViewModel = remember(app) { app.createChannelsViewModel() }
+    val updateViewModel = remember(app) { app.createUpdateViewModel() }
     val serverState by serverViewModel.uiState.collectAsState()
     val channelsState by channelsViewModel.uiState.collectAsState()
     val servers by app.serverRegistry.servers.collectAsState()
     val nodes by app.serverRegistry.nodes.collectAsState()
+    val updateState by updateViewModel.state.collectAsState()
+    val dismissedVersion by updateViewModel.dismissedVersionCode.collectAsState()
     val scope = rememberCoroutineScope()
     val nav = remember { AppNavigation() }
     val systemDark = isSystemInDarkTheme()
     var darkTheme by remember { mutableStateOf(systemDark) }
+    val context = LocalContext.current
+
+    LaunchedEffect(updateViewModel) {
+        updateViewModel.refresh()
+    }
 
     // Guard: if current chat target disappears, go back to main
     LaunchedEffect(nav.screen, servers, nodes) {
@@ -71,6 +83,20 @@ fun AppRoute(app: NerveApp) {
             when (val current = nav.screen) {
                 AppScreen.Main -> {
                     Column(modifier = Modifier.fillMaxSize()) {
+                        (updateState as? UpdateState.Available)
+                            ?.takeIf { it.info.versionCode != dismissedVersion }
+                            ?.let { available ->
+                                UpdateBanner(
+                                    info = available.info,
+                                    onUpdate = {
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(available.info.url))
+                                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        context.startActivity(intent)
+                                    },
+                                    onDismiss = { updateViewModel.dismiss() },
+                                )
+                            }
+
                         // Transient error banner
                         nav.transientError?.let { error ->
                             Row(modifier = Modifier.fillMaxWidth()) {

@@ -15,6 +15,9 @@ import com.nerve.android.presentation.nodes.NodesViewModel
 import com.nerve.android.presentation.server.ServerViewModel
 import com.nerve.android.transport.ClientRegistration
 import com.nerve.android.transport.RealNerveClient
+import com.nerve.android.update.HttpVersionFetcher
+import com.nerve.android.update.UpdateChecker
+import com.nerve.android.update.UpdateViewModel
 import com.nerve.android.util.Logger
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
@@ -29,6 +32,8 @@ data class ResolvedDmEntry(
     val key: String
         get() = "$serverId:$nodeId"
 }
+
+internal const val APP_VERSION_URL = "http://100.75.43.90/nerve-app-version.json"
 
 class NerveApp : Application() {
     lateinit var configStore: ServerConfigStore
@@ -103,6 +108,15 @@ class NerveApp : Application() {
     fun createServerViewModel(): ServerViewModel =
         ServerViewModel(
             serverRegistry = serverRegistry,
+            dispatcher = Dispatchers.Main.immediate,
+        )
+
+    fun createUpdateViewModel(): UpdateViewModel =
+        UpdateViewModel(
+            checker = UpdateChecker(
+                currentVersionCode = BuildConfig.VERSION_CODE,
+                fetchPayload = HttpVersionFetcher(versionUrl = APP_VERSION_URL),
+            ),
             dispatcher = Dispatchers.Main.immediate,
         )
 
