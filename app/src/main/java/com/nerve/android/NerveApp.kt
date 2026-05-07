@@ -118,6 +118,7 @@ class NerveApp : Application() {
                 fetchPayload = HttpVersionFetcher(versionUrl = APP_VERSION_URL),
             ),
             dispatcher = Dispatchers.Main.immediate,
+            cacheDirProvider = { cacheDir },
         )
 
     suspend fun ensureStarted() {

@@ -33,8 +33,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.ui.platform.LocalContext
 import com.nerve.android.NerveApp
 import com.nerve.android.ui.channels.ChannelChatRoute
@@ -43,6 +41,8 @@ import com.nerve.android.ui.chat.ChatRoute
 import com.nerve.android.ui.nodes.NodesRoute
 import com.nerve.android.ui.server.ServersScreen
 import com.nerve.android.ui.theme.NerveTheme
+import com.nerve.android.update.ApkInstaller
+import com.nerve.android.update.DownloadState
 import com.nerve.android.update.UpdateState
 import kotlinx.coroutines.launch
 
@@ -59,6 +59,7 @@ fun AppRoute(app: NerveApp) {
     val nodes by app.serverRegistry.nodes.collectAsState()
     val updateState by updateViewModel.state.collectAsState()
     val dismissedVersion by updateViewModel.dismissedVersionCode.collectAsState()
+    val downloadState by updateViewModel.download.collectAsState()
     val scope = rememberCoroutineScope()
     val nav = remember { AppNavigation() }
     val systemDark = isSystemInDarkTheme()
@@ -88,14 +89,32 @@ fun AppRoute(app: NerveApp) {
                             ?.let { available ->
                                 UpdateBanner(
                                     info = available.info,
+                                    download = downloadState,
                                     onUpdate = {
-                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(available.info.url))
-                                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                        context.startActivity(intent)
+                                        when (val current = downloadState) {
+                                            is DownloadState.Ready -> {
+                                                ApkInstaller.launchInstall(context, current.file)
+                                            }
+                                            DownloadState.Idle, is DownloadState.Failed,
+                                            is DownloadState.InProgress -> {
+                                                updateViewModel.startDownload()
+                                            }
+                                        }
                                     },
-                                    onDismiss = { updateViewModel.dismiss() },
+                                    onDismiss = {
+                                        updateViewModel.resetDownload()
+                                        updateViewModel.dismiss()
+                                    },
+                                    onRetry = { updateViewModel.startDownload() },
                                 )
                             }
+
+                        if (downloadState is DownloadState.Ready) {
+                            LaunchedEffect(downloadState) {
+                                val ready = downloadState as DownloadState.Ready
+                                ApkInstaller.launchInstall(context, ready.file)
+                            }
+                        }
 
                         // Transient error banner
                         nav.transientError?.let { error ->

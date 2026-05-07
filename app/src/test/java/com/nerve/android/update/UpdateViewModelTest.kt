@@ -28,11 +28,17 @@ class UpdateViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun vmWithRemote(versionCode: Int, current: Int = 1): UpdateViewModel {
+    private fun vmWithRemote(
+        versionCode: Int,
+        current: Int = 1,
+        downloader: ApkDownloader = ApkDownloader(),
+    ): UpdateViewModel {
         val payload = """{"versionCode":$versionCode,"versionName":"x","url":"http://h/x.apk"}"""
         return UpdateViewModel(
             checker = UpdateChecker(currentVersionCode = current) { payload },
             dispatcher = dispatcher,
+            downloader = downloader,
+            cacheDirProvider = { java.io.File(System.getProperty("java.io.tmpdir") ?: ".") },
         )
     }
 
@@ -56,6 +62,33 @@ class UpdateViewModelTest {
         vm.refresh()
         advanceUntilIdle()
         assertEquals(UpdateState.UpToDate, vm.state.value)
+    }
+
+    @Test
+    fun `startDownload reports progress and ends in Ready when download succeeds`() = runTest(dispatcher) {
+        val fakeDownloader = FakeDownloader(
+            outcome = FakeOutcome.Success(bytes = 4096),
+        )
+        val vm = vmWithRemote(versionCode = 5, current = 1, downloader = fakeDownloader)
+        vm.refresh()
+        advanceUntilIdle()
+        vm.startDownload()
+        advanceUntilIdle()
+        val state = vm.download.value as DownloadState.Ready
+        assertTrue(state.file.exists())
+    }
+
+    @Test
+    fun `startDownload ends in Failed when downloader fails`() = runTest(dispatcher) {
+        val fakeDownloader = FakeDownloader(outcome = FakeOutcome.Failure("boom"))
+        val vm = vmWithRemote(versionCode = 5, current = 1, downloader = fakeDownloader)
+        vm.refresh()
+        advanceUntilIdle()
+        vm.startDownload()
+        advanceUntilIdle()
+        val state = vm.download.value
+        assertTrue(state is DownloadState.Failed, "state=$state")
+        assertEquals("boom", (state as DownloadState.Failed).reason)
     }
 
     @Test
