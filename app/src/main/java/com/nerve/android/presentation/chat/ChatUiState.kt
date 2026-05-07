@@ -11,4 +11,5 @@ data class ChatUiState(
     val isStreaming: Boolean = false,
     val isSending: Boolean = false,
     val errorMessage: String? = null,
+    val failedMessages: Map<String, String> = emptyMap(), // messageId -> original text for retry
 )

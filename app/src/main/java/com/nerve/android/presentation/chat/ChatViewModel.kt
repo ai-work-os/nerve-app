@@ -233,23 +233,65 @@ class ChatViewModel(
             mapOf("serverId" to serverId, "nodeId" to nodeId, "len" to text.length),
         )
         _uiState.value = _uiState.value.copy(isSending = true, errorMessage = null)
+        val messageId = "local-${System.currentTimeMillis()}"
         val userEvent = DmMappedEvent.UserMessage(
             nodeId = nodeId,
             nodeName = nodeName,
             content = text,
             timestamp = System.currentTimeMillis(),
-            messageId = "local-${System.currentTimeMillis()}",
+            messageId = messageId,
         )
         sessionManager.onEvent(userEvent)
-        runCatching {
+        val result = runCatching {
             serverRegistry.client(serverId)?.prompt(nodeId, text)
-        }.onFailure {
+        }
+        if (result.isFailure) {
+            val error = result.exceptionOrNull()
             Logger.warn(
                 "ChatViewModel",
                 "dm_send_fail",
-                mapOf("serverId" to serverId, "nodeId" to nodeId, "reason" to it.message),
+                mapOf("serverId" to serverId, "nodeId" to nodeId, "reason" to error?.message),
             )
-            _uiState.value = _uiState.value.copy(errorMessage = it.message)
+            _uiState.value = _uiState.value.copy(
+                errorMessage = error?.message,
+                failedMessages = _uiState.value.failedMessages + (messageId to text),
+            )
+        }
+        _uiState.value = _uiState.value.copy(isSending = false)
+    }
+
+    suspend fun retryMessage(messageId: String) {
+        val text = _uiState.value.failedMessages[messageId] ?: run {
+            Logger.warn(
+                "ChatViewModel",
+                "dm_retry_unknown_id",
+                mapOf("messageId" to messageId),
+            )
+            return
+        }
+        val serverId = currentServerId ?: return
+        val nodeId = currentNodeId ?: return
+        Logger.debug(
+            "ChatViewModel",
+            "dm_retry_begin",
+            mapOf("serverId" to serverId, "nodeId" to nodeId, "messageId" to messageId),
+        )
+        _uiState.value = _uiState.value.copy(isSending = true, errorMessage = null)
+        val result = runCatching {
+            serverRegistry.client(serverId)?.prompt(nodeId, text)
+        }
+        if (result.isSuccess) {
+            _uiState.value = _uiState.value.copy(
+                failedMessages = _uiState.value.failedMessages - messageId,
+            )
+        } else {
+            val error = result.exceptionOrNull()
+            Logger.warn(
+                "ChatViewModel",
+                "dm_retry_fail",
+                mapOf("serverId" to serverId, "nodeId" to nodeId, "reason" to error?.message),
+            )
+            _uiState.value = _uiState.value.copy(errorMessage = error?.message)
         }
         _uiState.value = _uiState.value.copy(isSending = false)
     }

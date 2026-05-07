@@ -97,6 +97,10 @@ fun ChatRoute(
             }
         },
         onPickImage = { imagePicker.launch("image/*") },
+        onRetry = { messageId ->
+            Logger.debug("ChatRoute", "dm_retry", mapOf("serverId" to serverId, "nodeId" to nodeId, "messageId" to messageId))
+            scope.launch { viewModel.retryMessage(messageId) }
+        },
         onCancel = {
             Logger.debug("ChatRoute", "dm_cancel_begin", mapOf("serverId" to serverId, "nodeId" to nodeId))
             scope.launch { serverRegistry.client(serverId)?.cancelNode(nodeId) }
