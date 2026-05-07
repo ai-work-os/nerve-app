@@ -50,9 +50,15 @@ class RemoteLogBackend(
 
     init {
         scope.launch(Dispatchers.IO) {
+            Logger.debug("RemoteLogBackend", "loop_start", mapOf("intervalMs" to flushIntervalMs))
             while (isActive) {
                 delay(flushIntervalMs)
-                runCatching { flushNow() }
+                val snapshotSize = synchronized(buffer) { buffer.size }
+                Logger.debug("RemoteLogBackend", "loop_tick", mapOf("buffered" to snapshotSize))
+                runCatching { flushNow() }.onFailure {
+                    // Avoid feedback loop into our own backend — go straight to logcat
+                    logcat("flush_throw reason=${it.message}")
+                }
             }
         }
     }
@@ -87,17 +93,24 @@ class RemoteLogBackend(
             .url(endpointUrl)
             .post(body.toRequestBody("application/json".toMediaType()))
             .build()
-        val ok = runCatching {
-            client.newCall(request).execute().use { it.isSuccessful }
-        }.getOrDefault(false)
+        val result = runCatching {
+            client.newCall(request).execute().use { it.code to it.isSuccessful }
+        }
+        val ok = result.getOrNull()?.second == true
 
         if (ok) {
             mutex.withLock {
                 // Remove only what we sent — new lines may have been added meanwhile
                 repeat(snapshot.size) { buffer.pollFirst() }
             }
+        } else {
+            // Diagnostic to logcat directly — avoid feedback loop into this backend
+            logcat("flush_fail size=${snapshot.size} code=${result.getOrNull()?.first} err=${result.exceptionOrNull()?.message}")
         }
-        // On failure: keep buffer untouched, retry next flush
+    }
+
+    private fun logcat(msg: String) {
+        runCatching { android.util.Log.w("RemoteLogBackend", msg) }
     }
 
     private fun addToBuffer(line: String) {
