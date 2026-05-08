@@ -109,13 +109,6 @@ fun AppRoute(app: NerveApp) {
                                 )
                             }
 
-                        if (downloadState is DownloadState.Ready) {
-                            LaunchedEffect(downloadState) {
-                                val ready = downloadState as DownloadState.Ready
-                                ApkInstaller.launchInstall(context, ready.file)
-                            }
-                        }
-
                         // Transient error banner
                         nav.transientError?.let { error ->
                             Row(modifier = Modifier.fillMaxWidth()) {
