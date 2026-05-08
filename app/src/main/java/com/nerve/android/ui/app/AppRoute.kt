@@ -33,6 +33,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import com.nerve.android.NerveApp
 import com.nerve.android.ui.channels.ChannelChatRoute
 import com.nerve.android.ui.channels.ChannelsRoute
@@ -40,6 +41,9 @@ import com.nerve.android.ui.chat.ChatRoute
 import com.nerve.android.ui.nodes.NodesRoute
 import com.nerve.android.ui.server.ServersScreen
 import com.nerve.android.ui.theme.NerveTheme
+import com.nerve.android.update.ApkInstaller
+import com.nerve.android.update.DownloadState
+import com.nerve.android.update.UpdateState
 import kotlinx.coroutines.launch
 
 @Composable
@@ -48,14 +52,23 @@ fun AppRoute(app: NerveApp) {
     val serverViewModel = remember(app) { app.createServerViewModel() }
     val chatViewModel = remember(app) { app.createChatViewModel() }
     val channelsViewModel = remember(app) { app.createChannelsViewModel() }
+    val updateViewModel = remember(app) { app.createUpdateViewModel() }
     val serverState by serverViewModel.uiState.collectAsState()
     val channelsState by channelsViewModel.uiState.collectAsState()
     val servers by app.serverRegistry.servers.collectAsState()
     val nodes by app.serverRegistry.nodes.collectAsState()
+    val updateState by updateViewModel.state.collectAsState()
+    val dismissedVersion by updateViewModel.dismissedVersionCode.collectAsState()
+    val downloadState by updateViewModel.download.collectAsState()
     val scope = rememberCoroutineScope()
     val nav = remember { AppNavigation() }
     val systemDark = isSystemInDarkTheme()
     var darkTheme by remember { mutableStateOf(systemDark) }
+    val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        updateViewModel.refresh()
+    }
 
     // Guard: if current chat target disappears, go back to main
     LaunchedEffect(nav.screen, servers, nodes) {
@@ -71,6 +84,38 @@ fun AppRoute(app: NerveApp) {
             when (val current = nav.screen) {
                 AppScreen.Main -> {
                     Column(modifier = Modifier.fillMaxSize()) {
+                        (updateState as? UpdateState.Available)
+                            ?.takeIf { it.info.versionCode != dismissedVersion }
+                            ?.let { available ->
+                                UpdateBanner(
+                                    info = available.info,
+                                    download = downloadState,
+                                    onUpdate = {
+                                        when (val current = downloadState) {
+                                            is DownloadState.Ready -> {
+                                                ApkInstaller.launchInstall(context, current.file)
+                                            }
+                                            DownloadState.Idle, is DownloadState.Failed,
+                                            is DownloadState.InProgress -> {
+                                                updateViewModel.startDownload()
+                                            }
+                                        }
+                                    },
+                                    onDismiss = {
+                                        updateViewModel.resetDownload()
+                                        updateViewModel.dismiss()
+                                    },
+                                    onRetry = { updateViewModel.startDownload() },
+                                )
+                            }
+
+                        if (downloadState is DownloadState.Ready) {
+                            LaunchedEffect(downloadState) {
+                                val ready = downloadState as DownloadState.Ready
+                                ApkInstaller.launchInstall(context, ready.file)
+                            }
+                        }
+
                         // Transient error banner
                         nav.transientError?.let { error ->
                             Row(modifier = Modifier.fillMaxWidth()) {

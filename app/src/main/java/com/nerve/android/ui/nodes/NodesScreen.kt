@@ -55,6 +55,10 @@ import com.nerve.android.ui.theme.StatusError
 import com.nerve.android.ui.theme.StatusIdle
 import com.nerve.android.ui.theme.statusColor
 
+internal object SpawnDialogDefaults {
+    const val ADAPTER = "codex"
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NodesScreen(
@@ -272,7 +276,7 @@ private fun SpawnNodeDialog(
     onDismiss: () -> Unit,
 ) {
     var selectedServer by remember { mutableStateOf(servers.firstOrNull()) }
-    var adapter by remember { mutableStateOf("claude") }
+    var adapter by remember { mutableStateOf(SpawnDialogDefaults.ADAPTER) }
     var expanded by remember { mutableStateOf(false) }
     val canSubmit = selectedServer != null && adapter.isNotBlank()
 

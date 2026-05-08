@@ -34,4 +34,11 @@ interface NerveClient {
     suspend fun spawnNode(adapter: String, name: String?, cwd: String?): SpawnResult
     suspend fun cancelNode(nodeId: String)
     suspend fun stopNode(nodeId: String)
+
+    /**
+     * Hint that the network may have just become reachable. If the client is
+     * waiting on a reconnect backoff timer, it should wake up immediately.
+     * No-op when already connected or no reconnect is pending.
+     */
+    fun triggerReconnect() {}
 }

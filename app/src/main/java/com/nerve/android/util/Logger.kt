@@ -71,6 +71,10 @@ class CompositeLogBackend(private val backends: List<LogBackend>) : LogBackend {
     override fun write(level: LogLevel, tag: String, line: String, throwable: Throwable?) {
         backends.forEach { it.write(level, tag, line, throwable) }
     }
+
+    fun flatten(): List<LogBackend> = backends.flatMap { b ->
+        if (b is CompositeLogBackend) b.flatten() else listOf(b)
+    }
 }
 
 object Logger {
@@ -109,6 +113,21 @@ object Logger {
             "logger_initialized",
             mapOf("fileLogging" to true, "dir" to logsDir.absolutePath),
         )
+    }
+
+    /**
+     * Append a remote backend (e.g. RemoteLogBackend) onto the existing chain.
+     * Used to ship WARN+ERROR to a collector without disturbing the local
+     * file/log backends.
+     */
+    fun addBackend(extra: LogBackend) {
+        val current = backend
+        backend = if (current is CompositeLogBackend) {
+            CompositeLogBackend(current.flatten() + extra)
+        } else {
+            CompositeLogBackend(listOf(current, extra))
+        }
+        debug("Logger", "backend_added", mapOf("type" to extra::class.simpleName))
     }
 
     fun detectBackend(): LogBackend = try {

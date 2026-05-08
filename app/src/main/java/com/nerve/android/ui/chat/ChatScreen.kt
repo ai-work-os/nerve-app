@@ -31,6 +31,9 @@ fun ChatScreen(
     onStop: (() -> Unit)? = null,
     onBack: (() -> Unit)? = null,
     onOpenDm: ((String, String, String) -> Unit)? = null,
+    pendingAttachment: PendingAttachment? = null,
+    onClearAttachment: () -> Unit = {},
+    onRetry: (String) -> Unit = {},
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -66,6 +69,8 @@ fun ChatScreen(
                     streamingText = streamingText,
                     streamingBlocks = streamingBlocks,
                     onOpenDm = onOpenDm,
+                    failedMessageIds = state.failedMessages.keys,
+                    onRetry = onRetry,
                 )
             }
             HorizontalDivider()
@@ -74,6 +79,8 @@ fun ChatScreen(
                 isSending = state.isSending,
                 onSend = onSend,
                 onPickImage = onPickImage,
+                pendingAttachment = pendingAttachment,
+                onClearAttachment = onClearAttachment,
             )
         }
     }

@@ -243,6 +243,67 @@ class ChatViewModelTest {
     }
 
     @Test
+    fun `sendMessage failure marks message as failed with retry text`() = runTest {
+        val sessionManager = DmSessionManager()
+        val mapper = DmEventMapper()
+        val registry = FakeServerRegistry()
+        val client = FakeNerveClient().apply {
+            promptResult = Result.failure(RpcException.TransportDisconnected())
+        }
+        registry.clients["s1"] = client
+        val vm = ChatViewModel(sessionManager, mapper, registry, Dispatchers.Unconfined)
+
+        vm.enterDm("s1", "n1", "bot")
+        vm.sendMessage("hi")
+
+        val state = vm.uiState.value
+        val userMsg = state.messages.first { it.role == DmRole.USER && it.content == "hi" }
+        assertEquals("hi", state.failedMessages[userMsg.id])
+    }
+
+    @Test
+    fun `retryMessage re-sends and clears failed marker on success`() = runTest {
+        val sessionManager = DmSessionManager()
+        val mapper = DmEventMapper()
+        val registry = FakeServerRegistry()
+        val client = FakeNerveClient().apply {
+            promptResult = Result.failure(RpcException.TransportDisconnected())
+        }
+        registry.clients["s1"] = client
+        val vm = ChatViewModel(sessionManager, mapper, registry, Dispatchers.Unconfined)
+
+        vm.enterDm("s1", "n1", "bot")
+        vm.sendMessage("hi")
+
+        val state1 = vm.uiState.value
+        val userMsg = state1.messages.first { it.role == DmRole.USER && it.content == "hi" }
+        assertEquals("hi", state1.failedMessages[userMsg.id])
+
+        // retry succeeds
+        client.promptResult = Result.success(com.nerve.android.transport.model.PromptResult(stopReason = "stop"))
+        vm.retryMessage(userMsg.id)
+
+        val state2 = vm.uiState.value
+        assertNull(state2.failedMessages[userMsg.id])
+        assertEquals(2, client.promptCalls.size, "prompt should be called twice (initial + retry)")
+    }
+
+    @Test
+    fun `retryMessage with unknown id is a no-op`() = runTest {
+        val sessionManager = DmSessionManager()
+        val mapper = DmEventMapper()
+        val registry = FakeServerRegistry()
+        val client = FakeNerveClient()
+        registry.clients["s1"] = client
+        val vm = ChatViewModel(sessionManager, mapper, registry, Dispatchers.Unconfined)
+
+        vm.enterDm("s1", "n1", "bot")
+        vm.retryMessage("does-not-exist")
+
+        assertTrue(client.promptCalls.isEmpty())
+    }
+
+    @Test
     fun `sendImage sends prompt with image attachment and local user message`() = runTest {
         val sessionManager = DmSessionManager()
         val mapper = DmEventMapper()

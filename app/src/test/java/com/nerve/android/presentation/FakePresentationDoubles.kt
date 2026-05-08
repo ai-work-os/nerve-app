@@ -42,6 +42,7 @@ class FakeServerRegistry : ServerRegistry {
     val addServerCalls = mutableListOf<ServerConfig>()
     val removeServerCalls = mutableListOf<String>()
     var startCalls = 0
+    var triggerReconnectAllCalls = 0
 
     override suspend fun start(registration: ClientRegistration) {
         startCalls += 1
@@ -60,4 +61,9 @@ class FakeServerRegistry : ServerRegistry {
     }
 
     override suspend fun client(serverId: String): NerveClient? = clients[serverId]
+
+    override fun triggerReconnectAll() {
+        triggerReconnectAllCalls += 1
+        clients.values.forEach { it.triggerReconnect() }
+    }
 }

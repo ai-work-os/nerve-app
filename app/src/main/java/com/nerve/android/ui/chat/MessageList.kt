@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -14,6 +15,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -36,6 +38,8 @@ fun MessageList(
     streamingBlocks: List<ContentBlock> = emptyList(),
     onAutoScroll: (() -> Unit)? = null,
     onOpenDm: ((String, String, String) -> Unit)? = null,
+    failedMessageIds: Set<String> = emptySet(),
+    onRetry: (String) -> Unit = {},
 ) {
     val visibleMessages = remember(messages) {
         messages.mapNotNull { msg ->
@@ -70,7 +74,25 @@ fun MessageList(
             }
         }
         items(visibleMessages, key = { it.id }) { message ->
-            MessageBubble(message, onOpenDm = onOpenDm)
+            Column(modifier = Modifier.fillMaxWidth()) {
+                MessageBubble(message, onOpenDm = onOpenDm)
+                if (message.id in failedMessageIds) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 2.dp),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "✗ 发送失败",
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                        TextButton(onClick = { onRetry(message.id) }) { Text("重试") }
+                    }
+                }
+            }
         }
         if (isStreaming) {
             if (streamingBlocks.isNotEmpty()) {

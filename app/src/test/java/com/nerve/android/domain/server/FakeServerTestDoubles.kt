@@ -48,6 +48,7 @@ class FakeNerveClient : NerveClient {
     var promptResult: Result<PromptResult> = Result.success(PromptResult(stopReason = "stop"))
     var spawnResult: Result<SpawnResult> = Result.success(SpawnResult(nodeId = "n1"))
     var stopResult: Result<Unit> = Result.success(Unit)
+    var triggerReconnectCalls = 0
 
     override suspend fun connect(server: ServerConfig, registration: ClientRegistration) {
         connectCalls += 1
@@ -107,6 +108,10 @@ class FakeNerveClient : NerveClient {
     override suspend fun stopNode(nodeId: String) {
         stopCalls += nodeId
         stopResult.getOrThrow()
+    }
+
+    override fun triggerReconnect() {
+        triggerReconnectCalls += 1
     }
 }
 
