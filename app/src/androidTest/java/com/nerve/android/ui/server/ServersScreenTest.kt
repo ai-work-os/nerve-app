@@ -33,6 +33,7 @@ class ServersScreenTest {
                 onRefreshServer = { refreshCall = it },
                 onAddServer = { _, _, _ -> },
                 onRemoveServer = {},
+                onReorder = {},
             )
         }
 
