@@ -63,6 +63,7 @@ dependencies {
     implementation("io.noties.markwon:core:4.6.2")
     implementation("io.noties.markwon:ext-tables:4.6.2")
     implementation("io.noties.markwon:ext-strikethrough:4.6.2")
+    implementation("sh.calvin.reorderable:reorderable:2.4.3")
 
     testImplementation(kotlin("test"))
     testImplementation(kotlin("reflect"))
