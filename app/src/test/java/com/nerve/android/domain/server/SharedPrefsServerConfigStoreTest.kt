@@ -46,6 +46,21 @@ class SharedPrefsServerConfigStoreTest {
     }
 
     @Test
+    fun `saveAll preserves explicit order across reload`() = runTest {
+        val prefs = InMemorySharedPreferences()
+        val store = SharedPrefsServerConfigStore(prefs)
+        val ordered = listOf(
+            ServerConfig(id = "home", name = "Home Server", address = "100.75.43.90:4800"),
+            ServerConfig(id = "mac", name = "Mac", address = "100.109.126.37:4800"),
+            ServerConfig(id = "mac-test", name = "Mac (test 4801)", address = "100.109.126.37:4801"),
+        )
+
+        store.saveAll(ordered)
+
+        assertEquals(ordered, SharedPrefsServerConfigStore(prefs).load())
+    }
+
+    @Test
     fun `dirty json falls back to default server`() = runTest {
         val prefs = InMemorySharedPreferences()
         prefs.edit().putString("server_configs_json", "{bad json").commit()
