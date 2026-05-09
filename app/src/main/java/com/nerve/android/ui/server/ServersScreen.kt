@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import sh.calvin.reorderable.ReorderableItem
-import sh.calvin.reorderable.rememberReorderableLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -38,6 +36,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,6 +51,8 @@ import com.nerve.android.presentation.server.ServerUiState
 import com.nerve.android.transport.ConnectionState
 import com.nerve.android.ui.theme.StatusError
 import com.nerve.android.ui.theme.StatusIdle
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -114,13 +115,38 @@ fun ServersScreen(
                     }
                 }
             } else {
+                // Local working copy of server IDs for drag: mirrors state.servers but stays
+                // independent during a drag gesture so we don't depend on async ViewModel updates.
+                var workingIds by remember { mutableStateOf(state.servers.map { it.id }) }
+
+                // When the external state settles (e.g. after onReorder round-trips back, or
+                // another source mutates the list), re-sync the local mirror.
+                LaunchedEffect(state.servers) {
+                    workingIds = state.servers.map { it.id }
+                }
+
                 val lazyListState = rememberLazyListState()
                 val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
-                    val ids = state.servers.map { it.id }.toMutableList()
-                    val moved = ids.removeAt(from.index)
-                    ids.add(to.index, moved)
-                    onReorder(ids)
+                    // Drag-in-progress: update local mirror only, no I/O.
+                    workingIds = workingIds.toMutableList().apply {
+                        add(to.index, removeAt(from.index))
+                    }
                 }
+
+                // Commit the final order once the finger lifts (isAnyItemDragging: true → false).
+                // drag commit timing manually verified on device
+                var wasDragging by remember { mutableStateOf(false) }
+                LaunchedEffect(reorderableState.isAnyItemDragging) {
+                    if (wasDragging && !reorderableState.isAnyItemDragging) {
+                        if (workingIds != state.servers.map { it.id }) {
+                            onReorder(workingIds)
+                        }
+                    }
+                    wasDragging = reorderableState.isAnyItemDragging
+                }
+
+                // Derive render order from local mirror so UI is immediately responsive.
+                val orderedServers = workingIds.mapNotNull { id -> state.servers.firstOrNull { it.id == id } }
 
                 LazyColumn(
                     state = lazyListState,
@@ -128,7 +154,7 @@ fun ServersScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(
-                        items = state.servers,
+                        items = orderedServers,
                         key = { it.id },
                     ) { server ->
                         ReorderableItem(reorderableState, key = server.id) { isDragging ->
