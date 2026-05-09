@@ -85,6 +85,20 @@ class ServerViewModelTest {
         assertEquals(listOf(ConnectionState.CONNECTED), vm.uiState.value.connections.map { it.state })
     }
 
+    @Test
+    fun `reorderServers delegates to registry`() = runTest {
+        val registry = FakeServerRegistry()
+        registry.servers.value = listOf(
+            ServerConfig("s1", "Home", "10.0.0.1:4800"),
+            ServerConfig("s2", "Lab", "10.0.0.2:4800"),
+        )
+        val vm = ServerViewModel(registry, Dispatchers.Unconfined)
+
+        vm.reorderServers(listOf("s2", "s1"))
+
+        assertEquals(listOf(listOf("s2", "s1")), registry.reorderServerCalls)
+    }
+
     private fun clearViewModel(viewModel: ViewModel) {
         val method = ViewModel::class.java.getDeclaredMethod("onCleared")
         method.isAccessible = true
