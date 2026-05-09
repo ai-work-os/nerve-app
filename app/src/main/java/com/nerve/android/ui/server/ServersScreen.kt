@@ -11,6 +11,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -111,7 +114,16 @@ fun ServersScreen(
                     }
                 }
             } else {
+                val lazyListState = rememberLazyListState()
+                val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
+                    val ids = state.servers.map { it.id }.toMutableList()
+                    val moved = ids.removeAt(from.index)
+                    ids.add(to.index, moved)
+                    onReorder(ids)
+                }
+
                 LazyColumn(
+                    state = lazyListState,
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
@@ -119,87 +131,92 @@ fun ServersScreen(
                         items = state.servers,
                         key = { it.id },
                     ) { server ->
-                        val connection = state.connections.firstOrNull { it.serverId == server.id }?.state
-                            ?: ConnectionState.DISCONNECTED
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surface,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
+                        ReorderableItem(reorderableState, key = server.id) { isDragging ->
+                            val connection = state.connections.firstOrNull { it.serverId == server.id }?.state
+                                ?: ConnectionState.DISCONNECTED
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surface,
+                                tonalElevation = if (isDragging) 8.dp else 0.dp,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .longPressDraggableHandle(),
                             ) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = if (connection == ConnectionState.CONNECTED) StatusIdle else StatusError,
-                                    modifier = Modifier.size(10.dp),
-                                ) {}
-                                Column(
-                                    modifier = Modifier.weight(1f).padding(start = 12.dp),
+                                Row(
+                                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Text(
-                                        server.name,
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 15.sp,
-                                    )
-                                    Text(
-                                        server.address,
-                                        fontSize = 12.sp,
-                                        fontFamily = FontFamily.Monospace,
-                                    )
-                                }
-                                val index = state.servers.indexOfFirst { it.id == server.id }
-                                IconButton(
-                                    onClick = {
-                                        if (index > 0) {
-                                            val ids = state.servers.map { it.id }.toMutableList()
-                                            val tmp = ids.removeAt(index)
-                                            ids.add(index - 1, tmp)
-                                            onReorder(ids)
-                                        }
-                                    },
-                                    enabled = index > 0,
-                                ) {
-                                    Icon(
-                                        Icons.Default.KeyboardArrowUp,
-                                        contentDescription = "Move ${server.name} up",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                                IconButton(
-                                    onClick = {
-                                        if (index in 0 until state.servers.lastIndex) {
-                                            val ids = state.servers.map { it.id }.toMutableList()
-                                            val tmp = ids.removeAt(index)
-                                            ids.add(index + 1, tmp)
-                                            onReorder(ids)
-                                        }
-                                    },
-                                    enabled = index >= 0 && index < state.servers.lastIndex,
-                                ) {
-                                    Icon(
-                                        Icons.Default.KeyboardArrowDown,
-                                        contentDescription = "Move ${server.name} down",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                                IconButton(
-                                    onClick = { onRefreshServer(server.id) },
-                                    enabled = !state.isRefreshing,
-                                ) {
-                                    Icon(
-                                        Icons.Default.Refresh,
-                                        contentDescription = "Refresh ${server.name}",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                                IconButton(onClick = { onRemoveServer(server.id) }) {
-                                    Icon(
-                                        Icons.Default.Delete,
-                                        contentDescription = "Remove ${server.name}",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = if (connection == ConnectionState.CONNECTED) StatusIdle else StatusError,
+                                        modifier = Modifier.size(10.dp),
+                                    ) {}
+                                    Column(
+                                        modifier = Modifier.weight(1f).padding(start = 12.dp),
+                                    ) {
+                                        Text(
+                                            server.name,
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 15.sp,
+                                        )
+                                        Text(
+                                            server.address,
+                                            fontSize = 12.sp,
+                                            fontFamily = FontFamily.Monospace,
+                                        )
+                                    }
+                                    val index = state.servers.indexOfFirst { it.id == server.id }
+                                    IconButton(
+                                        onClick = {
+                                            if (index > 0) {
+                                                val ids = state.servers.map { it.id }.toMutableList()
+                                                val tmp = ids.removeAt(index)
+                                                ids.add(index - 1, tmp)
+                                                onReorder(ids)
+                                            }
+                                        },
+                                        enabled = index > 0,
+                                    ) {
+                                        Icon(
+                                            Icons.Default.KeyboardArrowUp,
+                                            contentDescription = "Move ${server.name} up",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            if (index in 0 until state.servers.lastIndex) {
+                                                val ids = state.servers.map { it.id }.toMutableList()
+                                                val tmp = ids.removeAt(index)
+                                                ids.add(index + 1, tmp)
+                                                onReorder(ids)
+                                            }
+                                        },
+                                        enabled = index >= 0 && index < state.servers.lastIndex,
+                                    ) {
+                                        Icon(
+                                            Icons.Default.KeyboardArrowDown,
+                                            contentDescription = "Move ${server.name} down",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = { onRefreshServer(server.id) },
+                                        enabled = !state.isRefreshing,
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Refresh,
+                                            contentDescription = "Refresh ${server.name}",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                    IconButton(onClick = { onRemoveServer(server.id) }) {
+                                        Icon(
+                                            Icons.Default.Delete,
+                                            contentDescription = "Remove ${server.name}",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
                                 }
                             }
                         }
