@@ -135,15 +135,13 @@ fun NodesScreen(
                     Text("Tap + to spawn one", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else {
-                val grouped = state.items
-                    .sortedWith(compareBy<NodeItemUi> { it.serverName }.thenBy { it.nodeName })
-                    .groupBy { it.serverName }
+                val grouped = groupNodesByServer(state.items, servers)
 
                 LazyColumn {
-                    grouped.forEach { (serverName, nodes) ->
-                        item(key = "header:$serverName") {
+                    grouped.forEach { (server, nodes) ->
+                        item(key = "header:${server.id}") {
                             Text(
-                                text = serverName.uppercase(),
+                                text = server.name.uppercase(),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 letterSpacing = 1.sp,
