@@ -153,6 +153,9 @@ fun AppRoute(app: NerveApp) {
                                     onRemoveServer = { serverId ->
                                         scope.launch { serverViewModel.removeServer(serverId) }
                                     },
+                                    onReorder = { orderedIds ->
+                                        scope.launch { serverViewModel.reorderServers(orderedIds) }
+                                    },
                                 )
                             }
                         }

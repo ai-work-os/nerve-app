@@ -17,6 +17,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
@@ -58,6 +60,7 @@ fun ServersScreen(
     onRefreshServer: (serverId: String) -> Unit,
     onAddServer: (id: String, name: String, address: String) -> Unit,
     onRemoveServer: (serverId: String) -> Unit,
+    onReorder: (orderedIds: List<String>) -> Unit,
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
 
@@ -144,6 +147,41 @@ fun ServersScreen(
                                         server.address,
                                         fontSize = 12.sp,
                                         fontFamily = FontFamily.Monospace,
+                                    )
+                                }
+                                val index = state.servers.indexOfFirst { it.id == server.id }
+                                IconButton(
+                                    onClick = {
+                                        if (index > 0) {
+                                            val ids = state.servers.map { it.id }.toMutableList()
+                                            val tmp = ids.removeAt(index)
+                                            ids.add(index - 1, tmp)
+                                            onReorder(ids)
+                                        }
+                                    },
+                                    enabled = index > 0,
+                                ) {
+                                    Icon(
+                                        Icons.Default.KeyboardArrowUp,
+                                        contentDescription = "Move ${server.name} up",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                IconButton(
+                                    onClick = {
+                                        if (index in 0 until state.servers.lastIndex) {
+                                            val ids = state.servers.map { it.id }.toMutableList()
+                                            val tmp = ids.removeAt(index)
+                                            ids.add(index + 1, tmp)
+                                            onReorder(ids)
+                                        }
+                                    },
+                                    enabled = index >= 0 && index < state.servers.lastIndex,
+                                ) {
+                                    Icon(
+                                        Icons.Default.KeyboardArrowDown,
+                                        contentDescription = "Move ${server.name} down",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
                                 IconButton(
