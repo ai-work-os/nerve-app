@@ -51,16 +51,30 @@ class NodeGroupingTest {
     }
 
     @Test
-    fun `nodes referencing unknown server ids are dropped`() {
+    fun `nodes whose server id is unknown render in a synthetic group at the end`() {
         val servers = listOf(ServerConfig("s1", "S1", "10.0.0.1:4800"))
         val items = listOf(
             NodeItemUi("s1", "S1", "n1", "bot", "idle"),
-            NodeItemUi("ghost", "Ghost", "n2", "bot", "idle"),
+            NodeItemUi("ghost", "Ghost", "n2", "ghost-bot", "idle"),
         )
 
         val grouped = groupNodesByServer(items, servers)
 
-        assertEquals(listOf("s1"), grouped.map { it.first.id })
-        assertEquals(listOf("n1"), grouped.single().second.map { it.nodeId })
+        assertEquals(listOf("s1", "ghost"), grouped.map { it.first.id })
+        assertEquals("Ghost", grouped.last().first.name)
+        assertEquals(listOf("n2"), grouped.last().second.map { it.nodeId })
+    }
+
+    @Test
+    fun `empty servers list still renders nodes by their own server name`() {
+        val items = listOf(
+            NodeItemUi("home", "Home Server", "n1", "bot", "idle"),
+            NodeItemUi("mac", "Mac", "n2", "bot", "idle"),
+        )
+
+        val grouped = groupNodesByServer(items, emptyList())
+
+        assertEquals(setOf("home", "mac"), grouped.map { it.first.id }.toSet())
+        assertEquals(2, grouped.size)
     }
 }
