@@ -28,9 +28,16 @@ class AppNavigationTest {
     }
 
     @Test
-    fun `invalid tab index is ignored`() {
+    fun `selecting life log tab (3) works`() {
         val nav = AppNavigation()
         nav.selectTab(3)
+        assertEquals(3, nav.selectedTab)
+    }
+
+    @Test
+    fun `invalid tab index is ignored`() {
+        val nav = AppNavigation()
+        nav.selectTab(4)
         assertEquals(0, nav.selectedTab)
         nav.selectTab(-1)
         assertEquals(0, nav.selectedTab)

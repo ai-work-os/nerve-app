@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Forum
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -35,6 +36,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import com.nerve.android.NerveApp
+import com.nerve.android.lifelog.ui.LifeLogScreen
+import com.nerve.android.lifelog.ui.LifeLogViewModel
 import com.nerve.android.ui.channels.ChannelChatRoute
 import com.nerve.android.ui.channels.ChannelsRoute
 import com.nerve.android.ui.chat.ChatRoute
@@ -53,6 +56,7 @@ fun AppRoute(app: NerveApp) {
     val chatViewModel = remember(app) { app.createChatViewModel() }
     val channelsViewModel = remember(app) { app.createChannelsViewModel() }
     val updateViewModel = remember(app) { app.createUpdateViewModel() }
+    val lifeLogViewModel = remember(app) { LifeLogViewModel(app) }
     val serverState by serverViewModel.uiState.collectAsState()
     val channelsState by channelsViewModel.uiState.collectAsState()
     val servers by app.serverRegistry.servers.collectAsState()
@@ -157,6 +161,7 @@ fun AppRoute(app: NerveApp) {
                                         scope.launch { serverViewModel.reorderServers(orderedIds) }
                                     },
                                 )
+                                3 -> LifeLogScreen(vm = lifeLogViewModel)
                             }
                         }
 
@@ -191,6 +196,13 @@ fun AppRoute(app: NerveApp) {
                                 onClick = { nav.selectTab(2) },
                                 icon = { Icon(Icons.Default.Dns, contentDescription = "Servers") },
                                 label = { Text("Servers") },
+                                colors = navColors,
+                            )
+                            NavigationBarItem(
+                                selected = nav.selectedTab == 3,
+                                onClick = { nav.selectTab(3) },
+                                icon = { Icon(Icons.Default.Mic, contentDescription = "Life Log") },
+                                label = { Text("Life Log") },
                                 colors = navColors,
                             )
                         }

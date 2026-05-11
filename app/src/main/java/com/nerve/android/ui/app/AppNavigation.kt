@@ -22,7 +22,7 @@ class AppNavigation {
         private set
 
     fun selectTab(index: Int) {
-        if (index !in 0..2) return
+        if (index !in 0..3) return
         selectedTab = index
     }
 
