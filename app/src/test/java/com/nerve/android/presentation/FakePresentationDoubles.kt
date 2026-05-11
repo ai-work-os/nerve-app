@@ -43,6 +43,7 @@ class FakeServerRegistry : ServerRegistry {
     val removeServerCalls = mutableListOf<String>()
     var startCalls = 0
     var triggerReconnectAllCalls = 0
+    val reorderServerCalls = mutableListOf<List<String>>()
 
     override suspend fun start(registration: ClientRegistration) {
         startCalls += 1
@@ -61,6 +62,12 @@ class FakeServerRegistry : ServerRegistry {
     }
 
     override suspend fun client(serverId: String): NerveClient? = clients[serverId]
+
+    override suspend fun reorderServers(orderedIds: List<String>) {
+        reorderServerCalls += orderedIds
+        servers.value = orderedIds.mapNotNull { id -> servers.value.firstOrNull { it.id == id } } +
+            servers.value.filterNot { config -> orderedIds.contains(config.id) }
+    }
 
     override fun triggerReconnectAll() {
         triggerReconnectAllCalls += 1

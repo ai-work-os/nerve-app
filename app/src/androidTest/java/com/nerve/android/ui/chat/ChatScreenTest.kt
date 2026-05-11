@@ -462,7 +462,9 @@ private class RecordingServerRegistry : ServerRegistry {
     override suspend fun refresh(serverId: String?) = Unit
     override suspend fun addServer(config: ServerConfig) = Unit
     override suspend fun removeServer(serverId: String) = Unit
+    override suspend fun reorderServers(orderedIds: List<String>) = Unit
     override suspend fun client(serverId: String): NerveClient? = clients[serverId]
+    override fun triggerReconnectAll() = Unit
 }
 
 private class RecordingNerveClient : NerveClient {

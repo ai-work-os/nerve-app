@@ -60,6 +60,16 @@ class ServerViewModel(
         _uiState.value = _uiState.value.copy(isRefreshing = false)
     }
 
+    suspend fun reorderServers(orderedIds: List<String>) {
+        Logger.debug(
+            "ServerViewModel",
+            "server_reorder_begin",
+            mapOf("orderedIds" to orderedIds.joinToString(",")),
+        )
+        runCatching { serverRegistry.reorderServers(orderedIds) }
+            .onFailure { _uiState.value = _uiState.value.copy(errorMessage = it.message) }
+    }
+
     suspend fun refreshServer(serverId: String) {
         Logger.debug("ServerViewModel", "server_refresh_begin", mapOf("serverId" to serverId))
         _uiState.value = _uiState.value.copy(isRefreshing = true, errorMessage = null)

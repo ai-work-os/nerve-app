@@ -31,6 +31,7 @@ interface ServerRegistry {
     suspend fun addServer(config: ServerConfig)
     suspend fun removeServer(serverId: String)
     suspend fun client(serverId: String): NerveClient?
+    suspend fun reorderServers(orderedIds: List<String>)
     fun triggerReconnectAll()
 }
 
@@ -149,6 +150,31 @@ class RealServerRegistry(
     }
 
     override suspend fun client(serverId: String): NerveClient? = clients[serverId]
+
+    override suspend fun reorderServers(orderedIds: List<String>) {
+        Logger.debug(
+            "ServerRegistry",
+            "registry_reorder_begin",
+            mapOf("orderedIds" to orderedIds.joinToString(",")),
+        )
+        val current = _servers.value
+        val byId = current.associateBy { it.id }
+        val reordered = orderedIds.mapNotNull { id -> byId[id] }
+        val missing = current.filterNot { config -> orderedIds.contains(config.id) }
+        val finalOrder = reordered + missing
+        if (finalOrder.map { it.id } == current.map { it.id }) {
+            Logger.debug("ServerRegistry", "registry_reorder_skip_noop")
+            return
+        }
+        configStore.saveAll(finalOrder)
+        _servers.value = finalOrder
+        publishSnapshots()
+        Logger.debug(
+            "ServerRegistry",
+            "registry_reorder_success",
+            mapOf("finalOrder" to finalOrder.joinToString(",") { it.id }),
+        )
+    }
 
     override fun triggerReconnectAll() {
         Logger.debug(
