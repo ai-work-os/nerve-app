@@ -8,14 +8,12 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
-import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.nerve.android.MainActivity
 import com.nerve.android.R
+import com.nerve.android.util.Logger
 import okhttp3.OkHttpClient
 import java.io.File
-
-private const val TAG = "LifeLogService"
 
 class LifeLogService : Service() {
     companion object {
@@ -43,7 +41,7 @@ class LifeLogService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        Log.i(TAG, "onCreate")
+        Logger.debug("LifeLogService", "service_start")
         config = LifeLogConfig(this)
         queue = UploadQueue(this)
         chunkWriter = ChunkWriter(this, config.deviceId)
@@ -58,23 +56,23 @@ class LifeLogService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.i(TAG, "onStartCommand action=${intent?.action}")
+        Logger.debug("LifeLogService", "intent_received", mapOf("action" to intent?.action))
         when (intent?.action) {
             ACTION_PAUSE -> {
                 paused = true
                 updateNotification("已暂停")
-                Log.i(TAG, "recording paused")
+                Logger.warn("LifeLogService", "recording_pause")
             }
             ACTION_RESUME -> {
                 paused = false
                 updateNotification("正在录音")
-                Log.i(TAG, "recording resumed")
+                Logger.warn("LifeLogService", "recording_resume")
             }
             ACTION_FLUSH -> {
                 Thread {
-                    Log.i(TAG, "manual flush triggered")
+                    Logger.debug("LifeLogService", "manual_flush_triggered")
                     val sent = policy.flushNow()
-                    Log.i(TAG, "manual flush done: sent=$sent")
+                    Logger.debug("LifeLogService", "manual_flush_done", mapOf("sent" to sent))
                 }.also { it.name = "lifelog-flush-thread"; it.start() }
             }
             ACTION_STOP -> {
@@ -88,17 +86,17 @@ class LifeLogService : Service() {
 
     private fun startRecording() {
         if (encoder != null) {
-            Log.i(TAG, "startRecording: already running, ignoring")
+            Logger.debug("LifeLogService", "start_already_running")
             return
         }
-        Log.i(TAG, "startRecording: homeUrl=${config.homeUrl} deviceId=${config.deviceId}")
+        Logger.debug("LifeLogService", "recording_start", mapOf("homeUrl" to config.homeUrl, "deviceId" to config.deviceId))
         startForeground(NOTI_ID, buildNotification("正在录音"))
         rotateChunk(initial = true)
         recorder.start { pcm, len ->
             if (paused) return@start
             encoder?.feed(pcm, len)
             if (System.currentTimeMillis() - chunkStartedAt >= CHUNK_DURATION_MS) {
-                Log.i(TAG, "chunk boundary reached, rotating")
+                Logger.debug("LifeLogService", "chunk_boundary")
                 rotateChunk(initial = false)
             }
         }
@@ -107,7 +105,7 @@ class LifeLogService : Service() {
             while (encoder != null) {
                 try { Thread.sleep(30_000) } catch (_: InterruptedException) { return@Thread }
                 if (!paused) {
-                    Log.i(TAG, "tickAuto: checking sync policy")
+                    Logger.debug("LifeLogService", "tick_auto")
                     policy.tickAuto()
                 }
             }
@@ -116,7 +114,6 @@ class LifeLogService : Service() {
         t.isDaemon = true
         t.start()
         tickThread = t
-        Log.i(TAG, "recording started")
     }
 
     @Synchronized
@@ -130,7 +127,7 @@ class LifeLogService : Service() {
             try {
                 encoder?.finishToFile()
             } catch (e: Exception) {
-                Log.e(TAG, "finishToFile failed", e)
+                Logger.error("LifeLogService", "encoder_finish_fail", mapOf("reason" to e.message), e)
             }
             if (finishedFile != null && finishedFile.exists() && finishedDuration > 0) {
                 try {
@@ -138,9 +135,13 @@ class LifeLogService : Service() {
                     val chunk = chunkWriter.write(bytes, finishedStart, finishedDuration)
                     queue.enqueue(chunk)
                     finishedFile.delete()
-                    Log.i(TAG, "chunk rotated: id=${chunk.chunkId} duration=${finishedDuration}ms size=${bytes.size}B")
+                    Logger.debug("LifeLogService", "chunk_rotate", mapOf(
+                        "chunkId" to chunk.chunkId,
+                        "durationMs" to finishedDuration,
+                        "sizeBytes" to bytes.size,
+                    ))
                 } catch (e: Exception) {
-                    Log.e(TAG, "chunk write/enqueue failed", e)
+                    Logger.error("LifeLogService", "chunk_persist_fail", mapOf("reason" to e.message), e)
                 }
             }
         }
@@ -149,11 +150,11 @@ class LifeLogService : Service() {
         encoder = OpusEncoder(nextFile)
         pendingChunkFile = nextFile
         chunkStartedAt = now
-        Log.i(TAG, "rotateChunk: initial=$initial nextFile=${nextFile.name}")
+        Logger.debug("LifeLogService", "rotate_chunk", mapOf("initial" to initial, "nextFile" to nextFile.name))
     }
 
     private fun stopRecordingAndSelf() {
-        Log.i(TAG, "stopRecordingAndSelf")
+        Logger.debug("LifeLogService", "service_stop")
         tickThread?.interrupt()
         tickThread = null
         val enc = encoder
@@ -161,15 +162,17 @@ class LifeLogService : Service() {
         try {
             enc?.finishToFile()
         } catch (e: Exception) {
-            Log.w(TAG, "finishToFile on stop", e)
+            Logger.warn("LifeLogService", "stop_encoder_fail", mapOf("reason" to e.message), e)
         }
         recorder.stop()
         pendingChunkFile?.delete()
         pendingChunkFile = null
-        try { queue.close() } catch (e: Exception) { Log.w(TAG, "queue.close", e) }
+        try { queue.close() } catch (e: Exception) {
+            Logger.warn("LifeLogService", "queue_close_fail", mapOf("reason" to e.message), e)
+        }
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
-        Log.i(TAG, "service stopped")
+        Logger.debug("LifeLogService", "service_stopped")
     }
 
     private fun createChannel() {
@@ -178,7 +181,7 @@ class LifeLogService : Service() {
             mgr.createNotificationChannel(
                 NotificationChannel(CHANNEL_ID, "Life Log Recording", NotificationManager.IMPORTANCE_LOW)
             )
-            Log.i(TAG, "notification channel created: $CHANNEL_ID")
+            Logger.debug("LifeLogService", "notif_channel_created", mapOf("id" to CHANNEL_ID))
         }
     }
 
@@ -199,13 +202,13 @@ class LifeLogService : Service() {
     private fun updateNotification(title: String) {
         val mgr = getSystemService(NotificationManager::class.java)
         mgr.notify(NOTI_ID, buildNotification(title))
-        Log.i(TAG, "notification updated: $title")
+        Logger.debug("LifeLogService", "notif_update", mapOf("title" to title))
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
-        Log.i(TAG, "onDestroy")
+        Logger.debug("LifeLogService", "service_destroy")
         stopRecordingAndSelf()
         super.onDestroy()
     }

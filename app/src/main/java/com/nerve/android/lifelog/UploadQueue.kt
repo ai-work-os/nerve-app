@@ -4,6 +4,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
+import com.nerve.android.util.Logger
 
 class UploadQueue(context: Context) {
   private val helper = object : SQLiteOpenHelper(context, "lifelog.db", null, 1) {
@@ -25,7 +26,12 @@ class UploadQueue(context: Context) {
     }
     override fun onUpgrade(db: SQLiteDatabase, old: Int, new: Int) {}
   }
-  private val db: SQLiteDatabase get() = helper.writableDatabase
+  private val db: SQLiteDatabase get() = try {
+    helper.writableDatabase
+  } catch (e: Exception) {
+    Logger.error("UploadQueue", "db_open_fail", mapOf("reason" to e.message), e)
+    throw e
+  }
 
   fun enqueue(c: Chunk) {
     val v = ContentValues().apply {
@@ -73,6 +79,7 @@ class UploadQueue(context: Context) {
   }
 
   fun markFailed(chunkId: String, err: String) {
+    Logger.warn("UploadQueue", "chunk_mark_failed", mapOf("chunkId" to chunkId, "reason" to err))
     db.execSQL(
       "UPDATE upload_queue SET status='failed', attempts=attempts+1, last_error=? WHERE chunk_id=?",
       arrayOf(err, chunkId)

@@ -84,8 +84,13 @@ object Logger {
         backend.write(LogLevel.DEBUG, tag, format(event, fields))
     }
 
-    fun warn(tag: String, event: String, fields: Map<String, Any?> = emptyMap()) {
-        backend.write(LogLevel.WARN, tag, format(event, fields))
+    fun warn(
+        tag: String,
+        event: String,
+        fields: Map<String, Any?> = emptyMap(),
+        throwable: Throwable? = null,
+    ) {
+        backend.write(LogLevel.WARN, tag, format(event, fields), throwable)
     }
 
     fun error(

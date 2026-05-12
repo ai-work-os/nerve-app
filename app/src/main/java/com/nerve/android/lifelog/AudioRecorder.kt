@@ -5,7 +5,7 @@ import android.annotation.SuppressLint
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
-import android.util.Log
+import com.nerve.android.util.Logger
 
 class AudioRecorder(
   val sampleRate: Int = 16000,
@@ -17,7 +17,12 @@ class AudioRecorder(
 
   @SuppressLint("MissingPermission") // RECORD_AUDIO checked at service start
   fun start(onPcm: (ByteArray, Int) -> Unit) {
-    val r = AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, channelConfig, audioFormat, bufferSize)
+    val r = try {
+      AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, channelConfig, audioFormat, bufferSize)
+    } catch (err: Exception) {
+      Logger.error("AudioRecorder", "mic_unavailable", mapOf("reason" to err.message), err)
+      throw err
+    }
     record = r
     r.startRecording()
     Thread {
@@ -30,7 +35,9 @@ class AudioRecorder(
   }
 
   fun stop() {
-    try { record?.stop() } catch (e: Exception) { Log.w("AudioRecorder", "stop", e) }
+    try { record?.stop() } catch (e: Exception) {
+      Logger.warn("AudioRecorder", "recorder_stop_fail", mapOf("reason" to e.message), e)
+    }
     record?.release()
     record = null
   }

@@ -1,5 +1,6 @@
 package com.nerve.android.lifelog
 
+import com.nerve.android.util.Logger
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
@@ -21,9 +22,15 @@ class Uploader(
     val file = File(c.path)
     if (!file.exists()) {
       // Source file gone — drop from queue
+      Logger.warn("Uploader", "file_missing", mapOf("chunkId" to c.chunkId, "path" to c.path))
       queue.markDone(c.chunkId)
       return true
     }
+    Logger.debug("Uploader", "upload_attempt", mapOf(
+      "chunkId" to c.chunkId,
+      "sizeBytes" to file.length(),
+      "homeUrl" to homeUrl,
+    ))
     queue.markUploading(c.chunkId)
     val meta = JSONObject().apply {
       put("deviceId", c.deviceId)
@@ -47,15 +54,22 @@ class Uploader(
     return try {
       client.newCall(req).execute().use { resp ->
         if (resp.isSuccessful) {
+          Logger.debug("Uploader", "upload_success", mapOf("chunkId" to c.chunkId, "code" to resp.code))
           queue.markDone(c.chunkId)
           file.delete()
           true
         } else {
+          Logger.warn("Uploader", "upload_fail", mapOf(
+            "chunkId" to c.chunkId,
+            "code" to resp.code,
+            "attempts" to queue.getAttempts(c.chunkId) + 1,
+          ))
           queue.markFailed(c.chunkId, "http ${resp.code}")
           false
         }
       }
     } catch (e: IOException) {
+      Logger.warn("Uploader", "upload_io_fail", mapOf("chunkId" to c.chunkId, "reason" to e.message), e)
       queue.markFailed(c.chunkId, e.message ?: "io error")
       false
     }
@@ -69,6 +83,7 @@ class Uploader(
       if (!uploadOne(c)) break
       sent++
     }
+    Logger.debug("Uploader", "flush_done", mapOf("sent" to sent))
     return sent
   }
 }

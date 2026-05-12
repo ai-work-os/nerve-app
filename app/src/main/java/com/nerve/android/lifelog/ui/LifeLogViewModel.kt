@@ -2,7 +2,6 @@ package com.nerve.android.lifelog.ui
 
 import android.app.Application
 import android.content.Intent
-import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -12,10 +11,9 @@ import androidx.lifecycle.viewModelScope
 import com.nerve.android.lifelog.LifeLogConfig
 import com.nerve.android.lifelog.LifeLogService
 import com.nerve.android.lifelog.UploadQueue
+import com.nerve.android.util.Logger
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-
-private const val TAG = "LifeLogViewModel"
 
 class LifeLogViewModel(app: Application) : AndroidViewModel(app) {
     private val config = LifeLogConfig(app)
@@ -32,7 +30,7 @@ class LifeLogViewModel(app: Application) : AndroidViewModel(app) {
     var token by mutableStateOf(config.token)
 
     init {
-        Log.i(TAG, "init: homeUrl=${config.homeUrl} deviceId=${config.deviceId}")
+        Logger.debug("LifeLogViewModel", "vm_init", mapOf("homeUrl" to config.homeUrl, "deviceId" to config.deviceId))
         // Poll queue counts every 5 seconds
         viewModelScope.launch {
             while (true) {
@@ -42,7 +40,7 @@ class LifeLogViewModel(app: Application) : AndroidViewModel(app) {
                     failedCount = q.failedCount()
                     q.close()
                 } catch (e: Exception) {
-                    Log.w(TAG, "queue poll failed", e)
+                    Logger.warn("LifeLogViewModel", "queue_poll_fail", mapOf("reason" to e.message), e)
                 }
                 delay(5_000)
             }
@@ -52,14 +50,14 @@ class LifeLogViewModel(app: Application) : AndroidViewModel(app) {
     fun toggleRecording() {
         val ctx = getApplication<Application>()
         if (!recording) {
-            Log.i(TAG, "toggleRecording: starting service")
+            Logger.warn("LifeLogViewModel", "recording_toggle", mapOf("action" to "start"))
             ctx.startForegroundService(
                 Intent(ctx, LifeLogService::class.java).setAction(LifeLogService.ACTION_START)
             )
             recording = true
             paused = false
         } else {
-            Log.i(TAG, "toggleRecording: stopping service")
+            Logger.warn("LifeLogViewModel", "recording_toggle", mapOf("action" to "stop"))
             ctx.startService(
                 Intent(ctx, LifeLogService::class.java).setAction(LifeLogService.ACTION_STOP)
             )
@@ -71,19 +69,19 @@ class LifeLogViewModel(app: Application) : AndroidViewModel(app) {
     fun togglePause() {
         val ctx = getApplication<Application>()
         val action = if (paused) LifeLogService.ACTION_RESUME else LifeLogService.ACTION_PAUSE
-        Log.i(TAG, "togglePause: action=$action")
+        Logger.debug("LifeLogViewModel", "pause_toggle", mapOf("action" to action))
         ctx.startService(Intent(ctx, LifeLogService::class.java).setAction(action))
         paused = !paused
     }
 
     fun flushNow() {
         val ctx = getApplication<Application>()
-        Log.i(TAG, "flushNow: sending FLUSH intent")
+        Logger.warn("LifeLogViewModel", "flush_now", mapOf("ts" to System.currentTimeMillis()))
         ctx.startService(Intent(ctx, LifeLogService::class.java).setAction(LifeLogService.ACTION_FLUSH))
     }
 
     fun saveSettings() {
-        Log.i(TAG, "saveSettings: homeUrl=$homeUrl")
+        Logger.debug("LifeLogViewModel", "settings_save", mapOf("homeUrl" to homeUrl))
         config.homeUrl = homeUrl
         config.token = token
     }
