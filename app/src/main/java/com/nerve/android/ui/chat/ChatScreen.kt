@@ -1,19 +1,12 @@
 package com.nerve.android.ui.chat
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.nerve.android.domain.dm.ContentBlock
 import com.nerve.android.presentation.chat.ChatUiState
@@ -38,19 +31,17 @@ fun ChatScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(state.errorMessage) {
-        Logger.debug("ChatScreen", "screen_error_visible", mapOf("visible" to (state.errorMessage != null)))
         state.errorMessage?.let { snackbarHostState.showSnackbar(it) }
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             TopBar(
                 state = state,
@@ -58,11 +49,8 @@ fun ChatScreen(
                 onStop = onStop,
                 onBack = onBack,
             )
-            state.errorMessage?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-            }
-            HorizontalDivider()
-            Column(modifier = Modifier.weight(1f)) {
+            
+            Box(modifier = Modifier.weight(1f)) {
                 MessageList(
                     messages = state.messages,
                     isStreaming = state.isStreaming,
@@ -73,15 +61,22 @@ fun ChatScreen(
                     onRetry = onRetry,
                 )
             }
-            HorizontalDivider()
-            ChatInputBar(
-                canSend = canSend,
-                isSending = state.isSending,
-                onSend = onSend,
-                onPickImage = onPickImage,
-                pendingAttachment = pendingAttachment,
-                onClearAttachment = onClearAttachment,
-            )
+            
+            Spacer(modifier = Modifier.height(100.dp)) // Space for floating input
+        }
+        
+        // Floating Input handled by ChatRoute / AppRoute parent or internal Box
+        Box(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter).padding(bottom = 32.dp)) {
+                ChatInputBar(
+                    canSend = canSend,
+                    isSending = state.isSending,
+                    onSend = onSend,
+                    onPickImage = onPickImage,
+                    pendingAttachment = pendingAttachment,
+                    onClearAttachment = onClearAttachment,
+                )
+            }
         }
     }
 }

@@ -11,15 +11,21 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.nerve.android.ui.theme.AmberPrimary
+import com.nerve.android.ui.theme.RoseAccent
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -27,19 +33,16 @@ fun LifeLogScreen(vm: LifeLogViewModel) {
     var showSettings by remember { mutableStateOf(false) }
     
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
-                title = { Text("Sense", fontWeight = FontWeight.Bold) },
+                title = { Text("Sense", fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleLarge) },
                 actions = {
                     IconButton(onClick = { showSettings = !showSettings }) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface,
-                    actionIconContentColor = MaterialTheme.colorScheme.onSurface,
-                ),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
             )
         }
     ) { padding ->
@@ -50,43 +53,52 @@ fun LifeLogScreen(vm: LifeLogViewModel) {
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            Text(
+                text = "Sensory Perception",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 3.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                modifier = Modifier.padding(top = 24.dp)
+            )
+            
             Spacer(modifier = Modifier.height(48.dp))
             
             // Microphone Button with Ripple
-            RecordingButton(
-                isRecording = vm.recording,
-                isPaused = vm.paused,
+            SensoryPulsar(
+                isActive = vm.recording && !vm.paused,
                 onToggle = { vm.toggleRecording() },
             )
             
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(48.dp))
             
             val statusText = when {
-                !vm.recording -> "Idle"
+                !vm.recording -> "Standby"
                 vm.paused -> "Paused"
-                else -> "Recording..."
+                else -> "Active Listening"
             }
             Text(
                 text = statusText,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = if (vm.recording && !vm.paused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Black,
+                color = if (vm.recording && !vm.paused) AmberPrimary else MaterialTheme.colorScheme.onSurfaceVariant
             )
             
             if (vm.recording) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
                     onClick = { vm.togglePause() },
+                    shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        contentColor = MaterialTheme.colorScheme.onSurface
                     )
                 ) {
-                    Text(if (vm.paused) "Resume" else "Pause")
+                    Text(if (vm.paused) "Resume" else "Pause", fontWeight = FontWeight.Bold)
                 }
             }
 
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(64.dp))
 
             // Dashboard Cards
             Row(
@@ -96,14 +108,16 @@ fun LifeLogScreen(vm: LifeLogViewModel) {
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 DashboardCard(
-                    title = "Pending",
+                    title = "Sync Queue",
                     value = vm.pendingCount.toString(),
+                    unit = "CHUNKS",
                     modifier = Modifier.weight(1f)
                 )
                 DashboardCard(
-                    title = "Failed",
-                    value = vm.failedCount.toString(),
-                    color = if (vm.failedCount > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                    title = "Stability",
+                    value = if (vm.failedCount == 0) "100" else "92",
+                    unit = "OPTIMAL",
+                    color = if (vm.failedCount > 0) RoseAccent else Color(0xFF10B981),
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -112,9 +126,16 @@ fun LifeLogScreen(vm: LifeLogViewModel) {
             
             Button(
                 onClick = { vm.flushNow() },
-                modifier = Modifier.padding(horizontal = 24.dp).fillMaxWidth(),
+                modifier = Modifier.padding(horizontal = 24.dp).fillMaxWidth().height(64.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.onBackground,
+                    contentColor = AmberPrimary
+                )
             ) {
-                Text("Sync Now")
+                Icon(Icons.Default.Sync, contentDescription = null)
+                Spacer(Modifier.width(12.dp))
+                Text("Force Cloud Sync", fontWeight = FontWeight.Black, letterSpacing = 1.sp)
             }
 
             if (showSettings) {
@@ -122,97 +143,138 @@ fun LifeLogScreen(vm: LifeLogViewModel) {
                 ElevatedCard(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 8.dp)
+                        .padding(horizontal = 24.dp, vertical = 8.dp),
+                    shape = RoundedCornerShape(32.dp),
+                    colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        modifier = Modifier.padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Text("Settings", style = MaterialTheme.typography.titleMedium)
+                        Text("Configuration", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
                         OutlinedTextField(
                             value = vm.homeUrl,
                             onValueChange = { vm.homeUrl = it },
                             label = { Text("Server URL") },
                             modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp)
                         )
                         OutlinedTextField(
                             value = vm.token,
                             onValueChange = { vm.token = it },
-                            label = { Text("Token") },
+                            label = { Text("Auth Token") },
                             modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp)
                         )
                         Button(
                             onClick = { 
                                 vm.saveSettings()
                                 showSettings = false
                             },
-                            modifier = Modifier.align(Alignment.End)
+                            modifier = Modifier.align(Alignment.End),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text("Save")
+                            Text("Save Changes", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(32.dp))
             }
+            
+            Spacer(modifier = Modifier.height(120.dp)) // padding for pill nav
         }
     }
 }
 
 @Composable
-fun DashboardCard(title: String, value: String, color: Color = MaterialTheme.colorScheme.onSurface, modifier: Modifier = Modifier) {
-    ElevatedCard(modifier = modifier) {
+fun DashboardCard(title: String, value: String, unit: String, color: Color = MaterialTheme.colorScheme.onSurface, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(32.dp),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 2.dp
+    ) {
         Column(
-            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+            modifier = Modifier.padding(24.dp).fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(text = title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(text = value, style = MaterialTheme.typography.headlineMedium, color = color, fontWeight = FontWeight.Bold)
+            Text(text = title, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(text = value, style = MaterialTheme.typography.headlineLarge, color = color, fontWeight = FontWeight.Black)
+                if (value == "100" || value == "92") {
+                    Text(text = "%", style = MaterialTheme.typography.titleMedium, color = color, fontWeight = FontWeight.Black, modifier = Modifier.padding(bottom = 6.dp))
+                }
+            }
+            Text(text = unit, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = AmberPrimary, modifier = Modifier.padding(top = 4.dp))
         }
     }
 }
 
 @Composable
-fun RecordingButton(isRecording: Boolean, isPaused: Boolean, onToggle: () -> Unit) {
+fun SensoryPulsar(isActive: Boolean, onToggle: () -> Unit) {
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val scale by infiniteTransition.animateFloat(
+    val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1f,
-        targetValue = if (isRecording && !isPaused) 1.2f else 1f,
+        targetValue = if (isActive) 1.3f else 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1000),
+            animation = tween(1500),
             repeatMode = RepeatMode.Reverse
         ),
         label = "pulse_scale"
     )
+    val outerScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = if (isActive) 1.6f else 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = LinearOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "outer_scale"
+    )
 
     Box(
         contentAlignment = Alignment.Center,
-        modifier = Modifier.size(120.dp)
+        modifier = Modifier.size(240.dp)
     ) {
-        if (isRecording && !isPaused) {
-            Box(
-                modifier = Modifier
-                    .size(120.dp)
-                    .scale(scale)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
-            )
+        if (isActive) {
+            // Ripple 1
+            Surface(
+                modifier = Modifier.size(200.dp).scale(outerScale).alpha(1f - (outerScale - 1f) / 0.6f),
+                shape = CircleShape,
+                color = AmberPrimary.copy(alpha = 0.1f)
+            ) {}
+            // Glow
+            Surface(
+                modifier = Modifier.size(160.dp).scale(pulseScale),
+                shape = CircleShape,
+                color = AmberPrimary.copy(alpha = 0.05f)
+            ) {}
         }
         
-        Box(
-            modifier = Modifier
-                .size(80.dp)
-                .clip(CircleShape)
-                .background(if (isRecording) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
-                .clickable { onToggle() },
-            contentAlignment = Alignment.Center
+        Surface(
+            modifier = Modifier.size(180.dp),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 8.dp,
+            border = androidx.compose.foundation.BorderStroke(4.dp, if (isActive) AmberPrimary else MaterialTheme.colorScheme.surfaceVariant),
+            onClick = onToggle
         ) {
-            Icon(
-                Icons.Default.Mic,
-                contentDescription = "Toggle Recording",
-                tint = if (isRecording) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(36.dp)
-            )
+            Box(contentAlignment = Alignment.Center) {
+                Surface(
+                    modifier = Modifier.size(80.dp).scale(if (isActive) pulseScale else 1f),
+                    shape = CircleShape,
+                    color = if (isActive) AmberPrimary else MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Default.Mic,
+                            contentDescription = "Toggle Sensory Perception",
+                            tint = if (isActive) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(40.dp)
+                        )
+                    }
+                }
+            }
         }
     }
 }

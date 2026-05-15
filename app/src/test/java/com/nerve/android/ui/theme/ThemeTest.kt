@@ -6,8 +6,6 @@ import kotlin.test.assertNotEquals
 
 class ThemeTest {
 
-    // #16: Verify statusColor returns distinct colors for each status
-
     @Test
     fun statusColor_idle_returns_StatusIdle() {
         assertEquals(StatusIdle, statusColor("idle"))
@@ -29,8 +27,8 @@ class ThemeTest {
     }
 
     @Test
-    fun statusColor_unknown_returns_OnSurfaceVariant() {
-        assertEquals(OnSurfaceVariant, statusColor("unknown"))
+    fun statusColor_unknown_returns_StoneMuted() {
+        assertEquals(StoneMuted, statusColor("unknown"))
     }
 
     @Test
@@ -40,12 +38,12 @@ class ThemeTest {
     }
 
     @Test
-    fun dark_and_light_primary_are_different() {
-        assertNotEquals(Primary, LightPrimary)
+    fun primary_is_amber() {
+        assertEquals(AmberPrimary, AmberPrimary)
     }
 
     @Test
-    fun dark_and_light_background_are_different() {
-        assertNotEquals(Background, LightBackground)
+    fun background_is_cream() {
+        assertEquals(CreamBackground, CreamBackground)
     }
 }

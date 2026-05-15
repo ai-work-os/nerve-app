@@ -4,37 +4,22 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Typeface
-import android.text.style.ForegroundColorSpan
 import android.widget.TextView
 import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
@@ -48,10 +33,16 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.nerve.android.domain.dm.DmAction
 import com.nerve.android.domain.dm.DmMessage
 import com.nerve.android.domain.dm.DmRole
+import com.nerve.android.ui.theme.AmberPrimary
+import com.nerve.android.ui.theme.StoneMain
+import com.nerve.android.ui.theme.WhiteSurface
 import io.noties.markwon.Markwon
 import io.noties.markwon.core.MarkwonTheme
 import io.noties.markwon.ext.strikethrough.StrikethroughPlugin
 import io.noties.markwon.ext.tables.TablePlugin
+
+import androidx.compose.foundation.shape.CornerSize
+import androidx.compose.runtime.CompositionLocalProvider
 
 @Composable
 fun MarkdownText(content: String, modifier: Modifier = Modifier) {
@@ -66,9 +57,6 @@ fun MarkdownText(content: String, modifier: Modifier = Modifier) {
                     override fun configureTheme(builder: MarkwonTheme.Builder) {
                         builder.codeTypeface(Typeface.MONOSPACE)
                         builder.codeBlockTypeface(Typeface.MONOSPACE)
-                    }
-                    override fun configureSpansFactory(builder: io.noties.markwon.MarkwonSpansFactory.Builder) {
-                        // Apply text color to all rendered spans
                     }
                 })
                 .build()
@@ -86,21 +74,21 @@ fun MarkdownText(content: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun Avatar(label: String, isUser: Boolean) {
-    val bg = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary
-    val fg = if (isUser) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onTertiary
+private fun SmallAvatar(label: String, isUser: Boolean) {
+    val bg = if (isUser) AmberPrimary else StoneMain
+    val fg = if (isUser) Color.White else AmberPrimary
     Box(
         modifier = Modifier
             .size(32.dp)
-            .clip(CircleShape)
+            .clip(RoundedCornerShape(10.dp))
             .background(bg),
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            label.take(1).uppercase(),
+            text = label.take(2).uppercase(),
             color = fg,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Black,
             textAlign = TextAlign.Center,
         )
     }
@@ -123,94 +111,93 @@ fun MessageBubble(
         clipboard.setPrimaryClip(ClipData.newPlainText("message", visibleContent))
         Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
     }
-    val background = when (message.role) {
-        DmRole.USER -> MaterialTheme.colorScheme.primaryContainer
-        DmRole.ASSISTANT -> MaterialTheme.colorScheme.surfaceVariant
-        DmRole.SYSTEM -> MaterialTheme.colorScheme.tertiaryContainer
-    }
+
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
         verticalAlignment = Alignment.Top,
     ) {
         if (!isUser) {
-            Avatar(label = message.nodeName.ifEmpty { "A" }, isUser = false)
-            Spacer(modifier = Modifier.width(8.dp))
+            SmallAvatar(label = message.nodeName.ifEmpty { "AI" }, isUser = false)
+            Spacer(modifier = Modifier.width(12.dp))
         }
+
         Column(modifier = Modifier.weight(1f, fill = false)) {
-            if (message.role == DmRole.ASSISTANT && message.nodeName.isNotEmpty()) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        message.nodeName,
-                        modifier = Modifier.padding(start = 4.dp, bottom = 2.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
+            // Header Info
             Row(
-                verticalAlignment = Alignment.Top,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
                 horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                if (isUser) {
-                    CopyButton(onClick = copyMessage)
-                    Spacer(modifier = Modifier.width(4.dp))
-                }
-                Box(
-                    modifier = Modifier
-                        .weight(1f, fill = false)
-                        .padding(vertical = 4.dp)
-                        .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
-                        .shadow(1.dp, RoundedCornerShape(16.dp))
-                        .combinedClickable(
-                            onClick = {},
-                            onLongClick = copyMessage,
+                Text(
+                    text = if (isUser) "Commander" else message.nodeName,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Black,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "• 12:45", // TODO: Real timestamp
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                )
+            }
+
+            // Message Surface (Bubble-less style)
+            Surface(
+                shape = RoundedCornerShape(24.dp).let {
+                    if (isUser) it.copy(topEnd = CornerSize(0.dp)) else it.copy(topStart = CornerSize(0.dp))
+                },
+                color = if (isUser) StoneMain else WhiteSurface,
+                shadowElevation = if (isUser) 4.dp else 1.dp,
+                border = if (!isUser) androidx.compose.foundation.BorderStroke(1.dp, AmberPrimary.copy(alpha = 0.1f)) else null,
+                modifier = Modifier
+                    .combinedClickable(onClick = {}, onLongClick = copyMessage)
+                    .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
+            ) {
+                Row {
+                    if (!isUser) {
+                        Box(
+                            modifier = Modifier
+                                .width(4.dp)
+                                .fillMaxHeight()
+                                .background(AmberPrimary)
+                                .align(Alignment.CenterVertically)
                         )
-                        .background(background, RoundedCornerShape(16.dp))
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        val action = message.action
-                        if (action == null) {
-                            MarkdownText(visibleContent)
-                        } else {
-                            Text(visibleContent)
-                        }
-                        if (action is DmAction.OpenDm && onOpenDm != null) {
-                            Button(
-                                onClick = { onOpenDm(action.serverId, action.nodeId, action.nodeName) },
+                    }
+                    Box(
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp)
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            val action = message.action
+                            CompositionLocalProvider(
+                                LocalContentColor provides if (isUser) AmberPrimary else MaterialTheme.colorScheme.onSurface
                             ) {
-                                Text("进入私聊")
+                                if (action == null) {
+                                    MarkdownText(visibleContent)
+                                } else {
+                                    Text(visibleContent, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            
+                            if (action is DmAction.OpenDm && onOpenDm != null) {
+                                Button(
+                                    onClick = { onOpenDm(action.serverId, action.nodeId, action.nodeName) },
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = AmberPrimary)
+                                ) {
+                                    Text("Enter DM", fontWeight = FontWeight.Black)
+                                }
                             }
                         }
                     }
                 }
-                if (!isUser) {
-                    Spacer(modifier = Modifier.width(4.dp))
-                    CopyButton(onClick = copyMessage)
-                }
             }
         }
-        if (isUser) {
-            Spacer(modifier = Modifier.width(8.dp))
-            Avatar(label = "U", isUser = true)
-        }
-    }
-}
 
-@Composable
-private fun CopyButton(onClick: () -> Unit) {
-    IconButton(
-        onClick = onClick,
-        modifier = Modifier
-            .padding(top = 6.dp)
-            .minimumInteractiveComponentSize(),
-    ) {
-        Icon(
-            Icons.Default.ContentCopy,
-            contentDescription = "Copy message",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(16.dp),
-        )
+        if (isUser) {
+            Spacer(modifier = Modifier.width(12.dp))
+            SmallAvatar(label = "CM", isUser = true)
+        }
     }
 }

@@ -1,28 +1,24 @@
 package com.nerve.android.ui.chat
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import com.nerve.android.ui.theme.AmberPrimary
+import com.nerve.android.ui.theme.CreamBackground
 
 @Composable
 fun ChatInputBar(
@@ -49,52 +45,88 @@ fun ChatInputBar(
     }
 
     Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (pendingAttachment != null) {
-            AssistChip(
-                onClick = onClearAttachment,
-                label = {
-                    Text(pendingAttachment.displayName ?: pendingAttachment.mimeType)
-                },
-                leadingIcon = {
-                    Icon(Icons.Default.Image, contentDescription = null)
-                },
-                trailingIcon = {
-                    Icon(Icons.Default.Close, contentDescription = "Remove attachment")
-                },
-                colors = AssistChipDefaults.assistChipColors(),
-            )
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            OutlinedTextField(
-                value = text,
-                onValueChange = { text = it },
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(vertical = 4.dp),
-                label = { Text("Message") },
-                maxLines = 5,
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Default),
-            )
-            IconButton(
-                onClick = onPickImage,
-                enabled = canSend && !isSending,
-                modifier = Modifier.padding(vertical = 12.dp),
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(12.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, AmberPrimary.copy(alpha = 0.2f)),
+                shadowElevation = 2.dp
             ) {
-                Icon(Icons.Default.Image, contentDescription = "Upload image")
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Image, contentDescription = null, tint = AmberPrimary, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = pendingAttachment.displayName ?: pendingAttachment.mimeType,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    IconButton(onClick = onClearAttachment, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Remove", modifier = Modifier.size(14.dp))
+                    }
+                }
             }
-            IconButton(
-                onClick = emitSend,
-                enabled = enabled,
-                modifier = Modifier.padding(vertical = 12.dp),
+        }
+        
+        Surface(
+            modifier = Modifier.fillMaxWidth().shadow(12.dp, RoundedCornerShape(32.dp)),
+            shape = RoundedCornerShape(32.dp),
+            color = Color.White.copy(alpha = 0.95f),
+            border = androidx.compose.foundation.BorderStroke(1.dp, AmberPrimary.copy(alpha = 0.05f))
+        ) {
+            Row(
+                modifier = Modifier.padding(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
+                IconButton(
+                    onClick = onPickImage,
+                    enabled = canSend && !isSending,
+                    modifier = Modifier.padding(start = 8.dp)
+                ) {
+                    Icon(Icons.Default.Image, contentDescription = "Upload image", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+
+                TextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text("Issue instruction...", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
+                    maxLines = 5,
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        disabledContainerColor = Color.Transparent,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                    ),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Default),
+                )
+
+                Button(
+                    onClick = emitSend,
+                    enabled = enabled,
+                    shape = RoundedCornerShape(24.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = AmberPrimary,
+                        disabledContainerColor = AmberPrimary.copy(alpha = 0.3f)
+                    ),
+                    contentPadding = PaddingValues(0.dp),
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.Send, 
+                        contentDescription = "Send", 
+                        tint = if (enabled) Color.White else Color.White.copy(alpha = 0.5f),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
     }
