@@ -78,11 +78,9 @@ fun ChatInputBar(
                     .weight(1f)
                     .padding(vertical = 4.dp),
                 label = { Text("Message") },
-                singleLine = true,
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = androidx.compose.foundation.text.KeyboardActions(
-                    onSend = { emitSend() },
-                ),
+                maxLines = 5,
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Default),
             )
             IconButton(
                 onClick = onPickImage,

@@ -54,9 +54,17 @@ fun MessageList(
     LaunchedEffect(visibleMessages.size, isStreaming, streamingText, streamingBlocks) {
         val extra = if (isStreaming) 1 else 0
         val target = (visibleMessages.size + extra - 1).coerceAtLeast(0)
-        Logger.debug("ChatScreen", "scroll_bottom", mapOf("count" to visibleMessages.size + extra))
-        onAutoScroll?.invoke()
-        listState.animateScrollToItem(target)
+        
+        // Only auto-scroll if the user is already looking at the bottom, 
+        // to avoid jumping while they read history.
+        val isAtBottom = if (listState.layoutInfo.visibleItemsInfo.isEmpty()) true 
+                        else listState.layoutInfo.visibleItemsInfo.last().index >= listState.layoutInfo.totalItemsCount - 2
+        
+        if (isAtBottom || isStreaming) {
+            Logger.debug("ChatScreen", "scroll_bottom", mapOf("count" to visibleMessages.size + extra))
+            onAutoScroll?.invoke()
+            listState.animateScrollToItem(target)
+        }
     }
 
     LazyColumn(

@@ -8,28 +8,28 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 // Dark theme
-val Background = Color(0xFF0F1117)
-val Surface = Color(0xFF1A1D27)
-val SurfaceVariant = Color(0xFF22252F)
-val OnSurface = Color(0xFFE4E4E7)
-val OnSurfaceVariant = Color(0xFFA1A1AA)
-val Outline = Color(0xFF2A2D3A)
-val Primary = Color(0xFF3B82F6)
+val Background = Color(0xFF0F172A)
+val Surface = Color(0xFF1E293B)
+val SurfaceVariant = Color(0xFF334155)
+val OnSurface = Color(0xFFF8FAFC)
+val OnSurfaceVariant = Color(0xFF94A3B8)
+val Outline = Color(0xFF475569)
+val Primary = Color(0xFF818CF8)
 
 // Light theme
-val LightBackground = Color(0xFFFAF8F5)
-val LightSurface = Color(0xFFF5F0EB)
-val LightSurfaceVariant = Color(0xFFEDE7E0)
-val LightOnSurface = Color(0xFF3D3832)
-val LightOnSurfaceVariant = Color(0xFF7A736B)
-val LightOutline = Color(0xFFD9D2CA)
-val LightPrimary = Color(0xFF2B8A7E)
+val LightBackground = Color(0xFFF8FAFC)
+val LightSurface = Color(0xFFF1F5F9)
+val LightSurfaceVariant = Color(0xFFE2E8F0)
+val LightOnSurface = Color(0xFF0F172A)
+val LightOnSurfaceVariant = Color(0xFF64748B)
+val LightOutline = Color(0xFFCBD5E1)
+val LightPrimary = Color(0xFF4F46E5)
 
 // Status colors
 val StatusIdle = Color(0xFF10B981)
-val StatusBusy = Color(0xFFF59E0B)
-val StatusError = Color(0xFFEF4444)
-val StatusStopped = Color(0xFF6B7280)
+val StatusBusy = Color(0xFF8B5CF6)
+val StatusError = Color(0xFFF43F5E)
+val StatusStopped = Color(0xFF64748B)
 
 fun statusColor(status: String): Color = when (status) {
     "idle" -> StatusIdle

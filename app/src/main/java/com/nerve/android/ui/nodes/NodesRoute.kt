@@ -14,6 +14,7 @@ fun NodesRoute(
     viewModel: NodesViewModel,
     serverRegistry: ServerRegistry,
     onOpenChat: (String, String, String) -> Unit,
+    onOpenServers: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsState()
     val servers by serverRegistry.servers.collectAsState()
@@ -32,6 +33,7 @@ fun NodesRoute(
             }
         },
         onOpenChat = onOpenChat,
+        onOpenServers = onOpenServers,
         onStop = { serverId, nodeId ->
             scope.launch {
                 viewModel.stopNode(serverId, nodeId)

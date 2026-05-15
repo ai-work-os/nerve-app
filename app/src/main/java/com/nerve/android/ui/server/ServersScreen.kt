@@ -15,11 +15,10 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
@@ -65,6 +64,7 @@ fun ServersScreen(
     onAddServer: (id: String, name: String, address: String) -> Unit,
     onRemoveServer: (serverId: String) -> Unit,
     onReorder: (orderedIds: List<String>) -> Unit,
+    onBack: () -> Unit,
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
 
@@ -72,6 +72,11 @@ fun ServersScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Servers", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
                 actions = {
                     IconButton(onClick = onToggleTheme) {
                         Icon(
@@ -115,26 +120,19 @@ fun ServersScreen(
                     }
                 }
             } else {
-                // Local working copy of server IDs for drag: mirrors state.servers but stays
-                // independent during a drag gesture so we don't depend on async ViewModel updates.
                 var workingIds by remember { mutableStateOf(state.servers.map { it.id }) }
 
-                // When the external state settles (e.g. after onReorder round-trips back, or
-                // another source mutates the list), re-sync the local mirror.
                 LaunchedEffect(state.servers) {
                     workingIds = state.servers.map { it.id }
                 }
 
                 val lazyListState = rememberLazyListState()
                 val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
-                    // Drag-in-progress: update local mirror only, no I/O.
                     workingIds = workingIds.toMutableList().apply {
                         add(to.index, removeAt(from.index))
                     }
                 }
 
-                // Commit the final order once the finger lifts (isAnyItemDragging: true → false).
-                // drag commit timing manually verified on device
                 var wasDragging by remember { mutableStateOf(false) }
                 LaunchedEffect(reorderableState.isAnyItemDragging) {
                     if (wasDragging && !reorderableState.isAnyItemDragging) {
@@ -145,7 +143,6 @@ fun ServersScreen(
                     wasDragging = reorderableState.isAnyItemDragging
                 }
 
-                // Derive render order from local mirror so UI is immediately responsive.
                 val orderedServers = workingIds.mapNotNull { id -> state.servers.firstOrNull { it.id == id } }
 
                 LazyColumn(
@@ -191,41 +188,6 @@ fun ServersScreen(
                                             fontFamily = FontFamily.Monospace,
                                         )
                                     }
-                                    val index = state.servers.indexOfFirst { it.id == server.id }
-                                    IconButton(
-                                        onClick = {
-                                            if (index > 0) {
-                                                val ids = state.servers.map { it.id }.toMutableList()
-                                                val tmp = ids.removeAt(index)
-                                                ids.add(index - 1, tmp)
-                                                onReorder(ids)
-                                            }
-                                        },
-                                        enabled = index > 0,
-                                    ) {
-                                        Icon(
-                                            Icons.Default.KeyboardArrowUp,
-                                            contentDescription = "Move ${server.name} up",
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
-                                    IconButton(
-                                        onClick = {
-                                            if (index in 0 until state.servers.lastIndex) {
-                                                val ids = state.servers.map { it.id }.toMutableList()
-                                                val tmp = ids.removeAt(index)
-                                                ids.add(index + 1, tmp)
-                                                onReorder(ids)
-                                            }
-                                        },
-                                        enabled = index >= 0 && index < state.servers.lastIndex,
-                                    ) {
-                                        Icon(
-                                            Icons.Default.KeyboardArrowDown,
-                                            contentDescription = "Move ${server.name} down",
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
                                     IconButton(
                                         onClick = { onRefreshServer(server.id) },
                                         enabled = !state.isRefreshing,
@@ -257,7 +219,7 @@ fun ServersScreen(
             isSubmitting = state.isSubmitting,
             onAdd = { address, name ->
                 val id = address.replace(":", "-").replace(".", "-")
-                onAddServer(id, name.ifBlank { address }, address)
+                onAddServer(id, if (name.isBlank()) address else name, address)
                 showAddDialog = false
             },
             onDismiss = { showAddDialog = false },

@@ -9,6 +9,7 @@ import com.nerve.android.transport.ServerConfig
 
 sealed interface AppScreen {
     data object Main : AppScreen
+    data object Servers : AppScreen
     data class Chat(val serverId: String, val nodeId: String, val nodeName: String) : AppScreen
     data class ChannelChat(val serverId: String, val channelId: String, val channelName: String) : AppScreen
 }
@@ -22,8 +23,13 @@ class AppNavigation {
         private set
 
     fun selectTab(index: Int) {
-        if (index !in 0..3) return
+        if (index !in 0..2) return
         selectedTab = index
+    }
+
+    fun openServers() {
+        transientError = null
+        screen = AppScreen.Servers
     }
 
     fun openChat(serverId: String, nodeId: String, nodeName: String) {

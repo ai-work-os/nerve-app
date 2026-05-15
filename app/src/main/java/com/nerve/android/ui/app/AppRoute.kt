@@ -129,39 +129,27 @@ fun AppRoute(app: NerveApp) {
 
                         // Tab content
                         Box(modifier = Modifier.weight(1f)) {
-                            when (nav.selectedTab) {
-                                0 -> NodesRoute(
-                                    viewModel = nodesViewModel,
-                                    serverRegistry = app.serverRegistry,
-                                    onOpenChat = { serverId, nodeId, nodeName ->
-                                        nav.openChat(serverId, nodeId, nodeName)
-                                    },
-                                )
-                                1 -> ChannelsRoute(
-                                    viewModel = channelsViewModel,
-                                    onOpenChannel = { serverId, channelId, channelName ->
-                                        nav.openChannelChat(serverId, channelId, channelName)
-                                    },
-                                )
-                                2 -> ServersScreen(
-                                    state = serverState,
-                                    isDarkTheme = darkTheme,
-                                    onToggleTheme = { darkTheme = !darkTheme },
-                                    onRefresh = { scope.launch { serverViewModel.refresh() } },
-                                    onRefreshServer = { serverId ->
-                                        scope.launch { serverViewModel.refreshServer(serverId) }
-                                    },
-                                    onAddServer = { id, name, address ->
-                                        scope.launch { serverViewModel.addServer(id, name, address) }
-                                    },
-                                    onRemoveServer = { serverId ->
-                                        scope.launch { serverViewModel.removeServer(serverId) }
-                                    },
-                                    onReorder = { orderedIds ->
-                                        scope.launch { serverViewModel.reorderServers(orderedIds) }
-                                    },
-                                )
-                                3 -> LifeLogScreen(vm = lifeLogViewModel)
+                            androidx.compose.animation.AnimatedContent(
+                                targetState = nav.selectedTab,
+                                label = "tab_transition",
+                            ) { tab ->
+                                when (tab) {
+                                    0 -> NodesRoute(
+                                        viewModel = nodesViewModel,
+                                        serverRegistry = app.serverRegistry,
+                                        onOpenChat = { serverId, nodeId, nodeName ->
+                                            nav.openChat(serverId, nodeId, nodeName)
+                                        },
+                                        onOpenServers = { nav.openServers() },
+                                    )
+                                    1 -> ChannelsRoute(
+                                        viewModel = channelsViewModel,
+                                        onOpenChannel = { serverId, channelId, channelName ->
+                                            nav.openChannelChat(serverId, channelId, channelName)
+                                        },
+                                    )
+                                    2 -> LifeLogScreen(vm = lifeLogViewModel)
+                                }
                             }
                         }
 
@@ -194,19 +182,35 @@ fun AppRoute(app: NerveApp) {
                             NavigationBarItem(
                                 selected = nav.selectedTab == 2,
                                 onClick = { nav.selectTab(2) },
-                                icon = { Icon(Icons.Default.Dns, contentDescription = "Servers") },
-                                label = { Text("Servers") },
-                                colors = navColors,
-                            )
-                            NavigationBarItem(
-                                selected = nav.selectedTab == 3,
-                                onClick = { nav.selectTab(3) },
                                 icon = { Icon(Icons.Default.Mic, contentDescription = "Life Log") },
                                 label = { Text("Life Log") },
                                 colors = navColors,
                             )
                         }
                     }
+                }
+
+                is AppScreen.Servers -> {
+                    BackHandler { nav.back() }
+                    ServersScreen(
+                        state = serverState,
+                        isDarkTheme = darkTheme,
+                        onToggleTheme = { darkTheme = !darkTheme },
+                        onRefresh = { scope.launch { serverViewModel.refresh() } },
+                        onRefreshServer = { serverId ->
+                            scope.launch { serverViewModel.refreshServer(serverId) }
+                        },
+                        onAddServer = { id, name, address ->
+                            scope.launch { serverViewModel.addServer(id, name, address) }
+                        },
+                        onRemoveServer = { serverId ->
+                            scope.launch { serverViewModel.removeServer(serverId) }
+                        },
+                        onReorder = { orderedIds ->
+                            scope.launch { serverViewModel.reorderServers(orderedIds) }
+                        },
+                        onBack = { nav.back() },
+                    )
                 }
 
                 is AppScreen.Chat -> {

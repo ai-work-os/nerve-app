@@ -1,85 +1,218 @@
 package com.nerve.android.lifelog.ui
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LifeLogScreen(vm: LifeLogViewModel) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text("Life Log", style = MaterialTheme.typography.headlineMedium)
-
-        val statusText = when {
-            !vm.recording -> "未启动"
-            vm.paused -> "已暂停"
-            else -> "正在录音"
+    var showSettings by remember { mutableStateOf(false) }
+    
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Sense", fontWeight = FontWeight.Bold) },
+                actions = {
+                    IconButton(onClick = { showSettings = !showSettings }) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                    actionIconContentColor = MaterialTheme.colorScheme.onSurface,
+                ),
+            )
         }
-        Text(statusText, style = MaterialTheme.typography.titleLarge)
-
-        Switch(
-            checked = vm.recording,
-            onCheckedChange = { vm.toggleRecording() },
-        )
-
-        if (vm.recording) {
-            Button(onClick = { vm.togglePause() }) {
-                Text(if (vm.paused) "继续" else "暂停")
-            }
-        }
-
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("待上传：${vm.pendingCount}")
-                Text("失败：${vm.failedCount}")
-            }
-        }
-
-        Button(
-            onClick = { vm.flushNow() },
-            modifier = Modifier.fillMaxWidth(),
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text("立即上传（任何网络）")
+            Spacer(modifier = Modifier.height(48.dp))
+            
+            // Microphone Button with Ripple
+            RecordingButton(
+                isRecording = vm.recording,
+                isPaused = vm.paused,
+                onToggle = { vm.toggleRecording() },
+            )
+            
+            Spacer(modifier = Modifier.height(32.dp))
+            
+            val statusText = when {
+                !vm.recording -> "Idle"
+                vm.paused -> "Paused"
+                else -> "Recording..."
+            }
+            Text(
+                text = statusText,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = if (vm.recording && !vm.paused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            
+            if (vm.recording) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = { vm.togglePause() },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                ) {
+                    Text(if (vm.paused) "Resume" else "Pause")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(48.dp))
+
+            // Dashboard Cards
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                DashboardCard(
+                    title = "Pending",
+                    value = vm.pendingCount.toString(),
+                    modifier = Modifier.weight(1f)
+                )
+                DashboardCard(
+                    title = "Failed",
+                    value = vm.failedCount.toString(),
+                    color = if (vm.failedCount > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            Button(
+                onClick = { vm.flushNow() },
+                modifier = Modifier.padding(horizontal = 24.dp).fillMaxWidth(),
+            ) {
+                Text("Sync Now")
+            }
+
+            if (showSettings) {
+                Spacer(modifier = Modifier.height(32.dp))
+                ElevatedCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 8.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text("Settings", style = MaterialTheme.typography.titleMedium)
+                        OutlinedTextField(
+                            value = vm.homeUrl,
+                            onValueChange = { vm.homeUrl = it },
+                            label = { Text("Server URL") },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = vm.token,
+                            onValueChange = { vm.token = it },
+                            label = { Text("Token") },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Button(
+                            onClick = { 
+                                vm.saveSettings()
+                                showSettings = false
+                            },
+                            modifier = Modifier.align(Alignment.End)
+                        ) {
+                            Text("Save")
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(32.dp))
+            }
         }
+    }
+}
 
-        HorizontalDivider()
-        Text("设置", style = MaterialTheme.typography.titleMedium)
+@Composable
+fun DashboardCard(title: String, value: String, color: Color = MaterialTheme.colorScheme.onSurface, modifier: Modifier = Modifier) {
+    ElevatedCard(modifier = modifier) {
+        Column(
+            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(text = title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(text = value, style = MaterialTheme.typography.headlineMedium, color = color, fontWeight = FontWeight.Bold)
+        }
+    }
+}
 
-        OutlinedTextField(
-            value = vm.homeUrl,
-            onValueChange = { vm.homeUrl = it },
-            label = { Text("home_url（如 http://100.x.x.x:4810）") },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        OutlinedTextField(
-            value = vm.token,
-            onValueChange = { vm.token = it },
-            label = { Text("token") },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Button(onClick = { vm.saveSettings() }) {
-            Text("保存设置")
+@Composable
+fun RecordingButton(isRecording: Boolean, isPaused: Boolean, onToggle: () -> Unit) {
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val scale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = if (isRecording && !isPaused) 1.2f else 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse_scale"
+    )
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier.size(120.dp)
+    ) {
+        if (isRecording && !isPaused) {
+            Box(
+                modifier = Modifier
+                    .size(120.dp)
+                    .scale(scale)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+            )
+        }
+        
+        Box(
+            modifier = Modifier
+                .size(80.dp)
+                .clip(CircleShape)
+                .background(if (isRecording) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
+                .clickable { onToggle() },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Default.Mic,
+                contentDescription = "Toggle Recording",
+                tint = if (isRecording) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(36.dp)
+            )
         }
     }
 }

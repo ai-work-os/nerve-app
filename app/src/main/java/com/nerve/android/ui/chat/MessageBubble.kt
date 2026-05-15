@@ -29,12 +29,16 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -111,8 +115,10 @@ fun MessageBubble(
 ) {
     val isUser = message.role == DmRole.USER
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
     val visibleContent = message.textContent.ifBlank { message.content }
     val copyMessage = {
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         clipboard.setPrimaryClip(ClipData.newPlainText("message", visibleContent))
         Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
@@ -155,6 +161,7 @@ fun MessageBubble(
                         .weight(1f, fill = false)
                         .padding(vertical = 4.dp)
                         .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
+                        .shadow(1.dp, RoundedCornerShape(16.dp))
                         .combinedClickable(
                             onClick = {},
                             onLongClick = copyMessage,
@@ -197,7 +204,7 @@ private fun CopyButton(onClick: () -> Unit) {
         onClick = onClick,
         modifier = Modifier
             .padding(top = 6.dp)
-            .size(28.dp),
+            .minimumInteractiveComponentSize(),
     ) {
         Icon(
             Icons.Default.ContentCopy,

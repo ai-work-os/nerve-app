@@ -1,48 +1,24 @@
 package com.nerve.android.ui.nodes
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.items
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -66,6 +42,7 @@ fun NodesScreen(
     servers: List<ServerConfig> = emptyList(),
     onRefresh: () -> Unit,
     onOpenChat: (String, String, String) -> Unit,
+    onOpenServers: () -> Unit,
     onStop: (String, String) -> Unit,
     onSpawn: (String, String, String?, String?) -> Unit,
     initialShowSpawnDialog: Boolean = false,
@@ -105,8 +82,8 @@ fun NodesScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { setShowSpawn(true) }) {
-                        Icon(Icons.Default.Add, contentDescription = "Spawn agent")
+                    IconButton(onClick = onOpenServers) {
+                        Icon(Icons.Default.Dns, contentDescription = "Servers")
                     }
                     IconButton(onClick = onRefresh, enabled = !state.isRefreshing) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh")
@@ -119,6 +96,11 @@ fun NodesScreen(
                 ),
             )
         },
+        floatingActionButton = {
+            FloatingActionButton(onClick = { setShowSpawn(true) }) {
+                Icon(Icons.Default.Add, contentDescription = "Spawn agent")
+            }
+        }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             state.errorMessage?.let {
@@ -137,29 +119,32 @@ fun NodesScreen(
             } else {
                 val grouped = groupNodesByServer(state.items, servers)
 
-                LazyColumn {
+                LazyVerticalStaggeredGrid(
+                    columns = StaggeredGridCells.Adaptive(minSize = 160.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalItemSpacing = 12.dp,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                ) {
                     grouped.forEach { (server, nodes) ->
-                        item(key = "header:${server.id}") {
+                        item(key = "header:${server.id}", span = StaggeredGridItemSpan.FullLine) {
                             Text(
                                 text = server.name.uppercase(),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 letterSpacing = 1.sp,
-                                modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp),
+                                modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
                             )
                         }
                         items(items = nodes, key = { "${it.serverId}:${it.nodeId}" }) { item ->
-                            NodeRow(
+                            NodeCard(
                                 item = item,
                                 onOpenChat = onOpenChat,
                                 onStop = onStop,
                             )
-                            HorizontalDivider(
-                                color = MaterialTheme.colorScheme.outline,
-                                thickness = 0.5.dp,
-                                modifier = Modifier.padding(start = 38.dp),
-                            )
                         }
+                    }
+                    item(span = StaggeredGridItemSpan.FullLine) {
+                        Spacer(modifier = Modifier.height(80.dp))
                     }
                 }
             }
@@ -176,12 +161,24 @@ fun NodesScreen(
 }
 
 @Composable
-private fun NodeRow(
+private fun NodeCard(
     item: NodeItemUi,
     onOpenChat: (String, String, String) -> Unit,
     onStop: (String, String) -> Unit,
 ) {
     var showStopConfirm by remember { mutableStateOf(false) }
+    val isBusy = item.status == "busy"
+    
+    val infiniteTransition = rememberInfiniteTransition(label = "node_pulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = if (isBusy) 1.4f else 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse_scale"
+    )
 
     if (showStopConfirm) {
         AlertDialog(
@@ -200,69 +197,105 @@ private fun NodeRow(
         )
     }
 
-    Row(
+    ElevatedCard(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onOpenChat(item.serverId, item.nodeId, item.nodeName) }
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+            .clickable { onOpenChat(item.serverId, item.nodeId, item.nodeName) },
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        ),
     ) {
-        // Status dot
-        Surface(
-            shape = CircleShape,
-            color = statusColor(item.status),
-            modifier = Modifier.size(10.dp),
-        ) {}
-
-        // Name + subtitle
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                item.nodeName,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 15.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(
+            modifier = Modifier.padding(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    item.status,
+                    text = item.nodeName,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                
+                if (item.status != "stopped") {
+                    IconButton(
+                        onClick = { showStopConfirm = true },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Stop ${item.nodeName}",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.size(12.dp)
+                ) {
+                    if (isBusy) {
+                        Surface(
+                            shape = CircleShape,
+                            color = statusColor(item.status).copy(alpha = 0.3f),
+                            modifier = Modifier
+                                .size(12.dp)
+                                .scale(pulseScale)
+                        ) {}
+                    }
+                    Surface(
+                        shape = CircleShape,
+                        color = statusColor(item.status),
+                        modifier = Modifier.size(8.dp),
+                    ) {}
+                }
+                
+                Text(
+                    text = item.status,
                     style = MaterialTheme.typography.bodySmall,
                     color = statusColor(item.status),
                 )
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                Text(
+                    text = item.shortId,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                )
+                
                 item.cwdLabel?.let {
                     Text(
-                        " · $it",
-                        style = MaterialTheme.typography.bodySmall,
+                        text = it,
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(start = 8.dp)
                     )
                 }
             }
         }
-
-        // Stop button
-        if (item.status != "stopped") {
-            IconButton(
-                onClick = { showStopConfirm = true },
-                modifier = Modifier.size(32.dp),
-            ) {
-                Icon(
-                    Icons.Default.Close,
-                    contentDescription = "Stop ${item.nodeName}",
-                    tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(16.dp),
-                )
-            }
-        }
-
-        // Short id
-        Text(
-            item.shortId,
-            style = MaterialTheme.typography.bodySmall,
-            fontFamily = FontFamily.Monospace,
-            color = MaterialTheme.colorScheme.outline,
-        )
     }
 }
 
