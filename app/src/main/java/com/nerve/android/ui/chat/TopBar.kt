@@ -1,13 +1,7 @@
 package com.nerve.android.ui.chat
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -15,8 +9,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.nerve.android.presentation.chat.ChatUiState
+import com.nerve.android.ui.theme.AmberPrimary
+import com.nerve.android.ui.theme.RoseAccent
 
 @Composable
 fun TopBar(
@@ -30,13 +29,14 @@ fun TopBar(
     if (showStopConfirm && onStop != null) {
         AlertDialog(
             onDismissRequest = { showStopConfirm = false },
-            title = { Text("Stop ${state.nodeName ?: "node"}?") },
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = { Text("Terminate Node", fontWeight = FontWeight.Black) },
             text = { Text("This will stop the agent process. Are you sure?") },
             confirmButton = {
                 TextButton(onClick = {
                     showStopConfirm = false
                     onStop()
-                }) { Text("Stop") }
+                }) { Text("Terminate", color = RoseAccent, fontWeight = FontWeight.Black) }
             },
             dismissButton = {
                 TextButton(onClick = { showStopConfirm = false }) { Text("Cancel") }
@@ -44,34 +44,75 @@ fun TopBar(
         )
     }
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+    Surface(
+        color = Color.Transparent,
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            onBack?.let {
-                TextButton(onClick = it) { Text("Back") }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                onBack?.let {
+                    Surface(
+                        onClick = it,
+                        shape = androidx.compose.foundation.shape.CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text("<", fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
+                }
+                Column {
+                    Text(
+                        text = state.nodeName ?: "Unknown Node",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Black,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    if (state.isStreaming) {
+                        Text(
+                            text = "responding...",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = AmberPrimary,
+                            letterSpacing = 1.sp
+                        )
+                    }
+                }
             }
-            Column {
-                Text(state.nodeName ?: "Unknown", style = MaterialTheme.typography.titleMedium)
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (state.isStreaming) {
-                    Text("responding...", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                    Button(
+                        onClick = onCancel,
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = RoseAccent.copy(alpha = 0.1f), contentColor = RoseAccent)
+                    ) {
+                        Text("STOP", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
+                    }
                 }
-            }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            if (state.isStreaming) {
-                TextButton(onClick = onCancel) {
-                    Text("Stop")
-                }
-            }
-            onStop?.let {
-                TextButton(onClick = { showStopConfirm = true }) {
-                    Text("Close")
+                onStop?.let {
+                    IconButton(onClick = { showStopConfirm = true }) {
+                        Surface(
+                            shape = androidx.compose.foundation.shape.CircleShape,
+                            color = RoseAccent.copy(alpha = 0.1f),
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text("×", fontWeight = FontWeight.Light, fontSize = 20.sp, color = RoseAccent)
+                            }
+                        }
+                    }
                 }
             }
         }
