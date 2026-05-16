@@ -82,26 +82,48 @@ fun NodesScreen(
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             
             // Hero Title Section
-            Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)) {
-                Text(
-                    text = "Hub",
-                    style = MaterialTheme.typography.displayMedium,
-                    fontWeight = FontWeight.Black,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
-                    Surface(
-                        shape = CircleShape,
-                        color = if (state.connectedCount > 0) StatusIdle else StatusError,
-                        modifier = Modifier.size(8.dp)
-                    ) {}
-                    Spacer(Modifier.width(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column {
                     Text(
-                        text = if (state.connectedCount > 0) "All systems operational" else "Connection unstable",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = "Hub",
+                        style = MaterialTheme.typography.displayMedium,
+                        fontWeight = FontWeight.Black,
+                        color = MaterialTheme.colorScheme.onBackground
                     )
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+                        Surface(
+                            shape = CircleShape,
+                            color = if (state.connectedCount > 0) StatusIdle else StatusError,
+                            modifier = Modifier.size(8.dp)
+                        ) {}
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = if (state.connectedCount > 0) "All systems operational" else "Connection unstable",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                
+                // CRITICAL: Manage Servers Entry Point
+                IconButton(
+                    onClick = onOpenServers,
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.Settings, contentDescription = "Manage Servers", tint = MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
                 }
             }
 
@@ -347,10 +369,12 @@ private fun SpawnNodeDialog(
                         ExposedDropdownMenu(
                             expanded = expanded,
                             onDismissRequest = { expanded = false },
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            shape = RoundedCornerShape(16.dp)
                         ) {
                             servers.forEach { server ->
                                 DropdownMenuItem(
-                                    text = { Text(server.name) },
+                                    text = { Text(server.name, fontWeight = FontWeight.Medium) },
                                     onClick = {
                                         selectedServer = server
                                         expanded = false
@@ -365,7 +389,11 @@ private fun SpawnNodeDialog(
                     onValueChange = { adapter = it },
                     label = { Text("Adapter") },
                     shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AmberPrimary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                    )
                 )
             }
         },

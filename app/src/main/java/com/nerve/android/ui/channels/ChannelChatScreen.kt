@@ -41,20 +41,47 @@ fun ChannelChatScreen(
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // Top bar
+                // High-End Top bar
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    TextButton(onClick = onBack) { Text("Back", fontWeight = FontWeight.Bold) }
-                    Column(modifier = Modifier.padding(start = 8.dp)) {
-                        Text("#$channelName", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
-                        Text(serverName, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), fontWeight = FontWeight.Bold)
+                    Surface(
+                        onClick = onBack,
+                        shape = androidx.compose.foundation.shape.CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text("<", fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
+                    Column {
+                        Text(
+                            text = "#$channelName",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Black,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = serverName,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
 
                 errorMessage?.let {
-                    Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 24.dp))
+                    Text(
+                        text = it,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                    )
                 }
 
                 // Messages

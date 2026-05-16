@@ -55,7 +55,7 @@ fun AppRoute(app: NerveApp) {
 
     NerveTheme(darkTheme = false) {
         Surface(
-            modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars),
+            modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
