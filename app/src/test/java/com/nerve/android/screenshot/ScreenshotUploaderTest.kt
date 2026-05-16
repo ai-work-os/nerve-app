@@ -54,4 +54,11 @@ class ScreenshotUploaderTest {
         val ok = uploader.upload(server.url("/").toString().trimEnd('/'), byteArrayOf(1), "image/png", "d", false, 1L)
         assertFalse(ok)
     }
+
+    @Test fun `网络异常返回 false`() {
+        server.shutdown()  // connection refused
+        val ok = uploader.upload(server.url("/").toString().trimEnd('/'),
+            byteArrayOf(1), "image/png", "d", false, 1L)
+        assertFalse(ok)
+    }
 }

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -29,7 +30,8 @@ fun ScreenshotSettings() {
 
     var enabled by remember { mutableStateOf(config.enabled) }
     var uploadUrl by remember { mutableStateOf(config.uploadUrl) }
-    var permissionDenied by remember { mutableStateOf(false) }
+    // Survives configuration changes (rotation) so the denial hint is not lost.
+    var permissionDenied by rememberSaveable { mutableStateOf(false) }
     var showUrlField by remember { mutableStateOf(false) }
 
     // Build the list of permissions to request
@@ -56,7 +58,7 @@ fun ScreenshotSettings() {
                     action = ScreenshotWatcherService.ACTION_START
                 }
             )
-            Logger.warn("ScreenshotSettings", "watcher_started")
+            Logger.debug("ScreenshotSettings", "watcher_started")
         } else {
             permissionDenied = true
             Logger.warn("ScreenshotSettings", "permission_denied")
@@ -104,7 +106,7 @@ fun ScreenshotSettings() {
                                     action = ScreenshotWatcherService.ACTION_STOP
                                 }
                             )
-                            Logger.warn("ScreenshotSettings", "watcher_stopped")
+                            Logger.debug("ScreenshotSettings", "watcher_stopped")
                         }
                     },
                 )
