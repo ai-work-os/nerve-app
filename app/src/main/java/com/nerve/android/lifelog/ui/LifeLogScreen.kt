@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.nerve.android.screenshot.ui.ScreenshotSettings
 import com.nerve.android.ui.theme.AmberPrimary
 import com.nerve.android.ui.theme.RoseAccent
 
@@ -180,6 +181,11 @@ fun LifeLogScreen(vm: LifeLogViewModel) {
                 }
             }
             
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Screenshot watcher settings — parallel to LifeLog, same Sense tab
+            ScreenshotSettings()
+
             Spacer(modifier = Modifier.height(120.dp)) // padding for pill nav
         }
     }
