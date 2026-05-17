@@ -31,6 +31,14 @@ class ScreenshotConfig(context: Context) {
         get() = prefs.getBoolean("auto_send", true)
         set(v) { prefs.edit().putBoolean("auto_send", v).apply() }
 
+    /**
+     * When true, camera photos (DCIM/Camera/) are also uploaded in addition to
+     * screenshots. Defaults to false because camera photos are private (opt-in).
+     */
+    var uploadCameraPhotos: Boolean
+        get() = prefs.getBoolean("upload_camera_photos", false)
+        set(v) { prefs.edit().putBoolean("upload_camera_photos", v).apply() }
+
     companion object {
         const val DEFAULT_UPLOAD_URL = "http://100.75.43.90:4812"
     }

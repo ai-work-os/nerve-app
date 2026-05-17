@@ -30,4 +30,27 @@ class ScreenshotDetectorTest {
         assertFalse(seen.firstTimeFor("content://media/external/images/media/1"))
         assertTrue(seen.firstTimeFor("content://media/external/images/media/2"))
     }
+
+    // ---- isCameraPhoto tests (TDD: written before implementation) ----
+
+    @Test fun `DCIM Camera 路径判为相机照片`() {
+        assertTrue(isCameraPhoto(relativePath = "DCIM/Camera/", bucketName = null))
+    }
+
+    @Test fun `bucketName 为 Camera 判为相机照片`() {
+        assertTrue(isCameraPhoto(relativePath = null, bucketName = "Camera"))
+    }
+
+    @Test fun `isCameraPhoto 大小写不敏感`() {
+        assertTrue(isCameraPhoto(relativePath = "dcim/camera/", bucketName = null))
+        assertTrue(isCameraPhoto(relativePath = null, bucketName = "camera"))
+    }
+
+    @Test fun `截图路径不是相机照片`() {
+        assertFalse(isCameraPhoto(relativePath = "Pictures/Screenshots/", bucketName = null))
+    }
+
+    @Test fun `null null 不是相机照片`() {
+        assertFalse(isCameraPhoto(relativePath = null, bucketName = null))
+    }
 }

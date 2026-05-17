@@ -217,8 +217,10 @@ class ScreenshotWatcherService : Service() {
                     continue
                 }
 
-                if (!isScreenshot(relativePath, bucketName)) {
-                    Logger.debug("ScreenshotWatcherService", "not_screenshot_skip",
+                val isShot = isScreenshot(relativePath, bucketName)
+                val isCam = isCameraPhoto(relativePath, bucketName) && config.uploadCameraPhotos
+                if (!isShot && !isCam) {
+                    Logger.debug("ScreenshotWatcherService", "not_target_skip",
                         mapOf("relativePath" to relativePath))
                     continue
                 }

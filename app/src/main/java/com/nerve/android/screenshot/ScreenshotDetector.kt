@@ -13,6 +13,13 @@ fun isScreenshot(relativePath: String?, bucketName: String?): Boolean {
     return false
 }
 
+/** True if a MediaStore image row looks like a camera photo (DCIM/Camera/). */
+fun isCameraPhoto(relativePath: String?, bucketName: String?): Boolean {
+    if (relativePath?.lowercase()?.contains("dcim/camera") == true) return true
+    if (bucketName?.lowercase() == "camera") return true
+    return false
+}
+
 /** Tracks already-handled image URIs so a given screenshot is processed once. */
 class SeenUris {
     private val seen = HashSet<String>()

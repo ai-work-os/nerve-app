@@ -11,6 +11,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.nerve.android.NerveApp
 import com.nerve.android.lifelog.ui.LifeLogScreen
 import com.nerve.android.lifelog.ui.LifeLogViewModel
@@ -44,9 +47,26 @@ fun AppRoute(app: NerveApp) {
     val scope = rememberCoroutineScope()
     val nav = remember { AppNavigation() }
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Periodic check and check on Resume
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                updateViewModel.refresh()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     LaunchedEffect(Unit) {
-        updateViewModel.refresh()
+        while (true) {
+            updateViewModel.refresh()
+            kotlinx.coroutines.delay(5 * 60 * 1000) // 5 minutes
+        }
     }
 
     LaunchedEffect(nav.screen, servers, nodes) {

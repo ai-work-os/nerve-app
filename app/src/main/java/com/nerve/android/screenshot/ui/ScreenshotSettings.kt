@@ -30,6 +30,7 @@ fun ScreenshotSettings() {
 
     var enabled by remember { mutableStateOf(config.enabled) }
     var autoSend by remember { mutableStateOf(config.autoSend) }
+    var uploadCameraPhotos by remember { mutableStateOf(config.uploadCameraPhotos) }
     var uploadUrl by remember { mutableStateOf(config.uploadUrl) }
     // Survives configuration changes (rotation) so the denial hint is not lost.
     var permissionDenied by rememberSaveable { mutableStateOf(false) }
@@ -132,6 +133,29 @@ fun ScreenshotSettings() {
                         autoSend = want
                         Logger.debug("ScreenshotSettings", "auto_send_changed",
                             mapOf("autoSend" to want))
+                    },
+                )
+            }
+
+            // Camera photos toggle — opt-in, off by default (photos are private)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    "也上传相机照片（默认只发截图）",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(
+                    checked = uploadCameraPhotos,
+                    onCheckedChange = { want ->
+                        config.uploadCameraPhotos = want
+                        uploadCameraPhotos = want
+                        Logger.debug("ScreenshotSettings", "upload_camera_photos_changed",
+                            mapOf("uploadCameraPhotos" to want))
                     },
                 )
             }
