@@ -65,7 +65,7 @@ fun AppRoute(app: NerveApp) {
     LaunchedEffect(Unit) {
         while (true) {
             updateViewModel.refresh()
-            kotlinx.coroutines.delay(5 * 60 * 1000) // 5 minutes
+            kotlinx.coroutines.delay(60 * 1000) // 1 minute
         }
     }
 
