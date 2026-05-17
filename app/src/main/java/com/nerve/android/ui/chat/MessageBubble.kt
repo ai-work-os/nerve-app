@@ -122,11 +122,13 @@ fun MessageBubble(
             Spacer(modifier = Modifier.width(12.dp))
         }
 
-        Column(modifier = Modifier.weight(1f, fill = false)) {
+        Column(
+            modifier = Modifier.weight(1f, fill = false),
+            horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
+        ) {
             // Header Info
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
-                horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
@@ -155,39 +157,28 @@ fun MessageBubble(
                     .combinedClickable(onClick = {}, onLongClick = copyMessage)
                     .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
             ) {
-                Row {
-                    if (!isUser) {
-                        Box(
-                            modifier = Modifier
-                                .width(4.dp)
-                                .fillMaxHeight()
-                                .background(AmberPrimary)
-                                .align(Alignment.CenterVertically)
-                        )
-                    }
-                    Box(
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp)
-                    ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            val action = message.action
-                            CompositionLocalProvider(
-                                LocalContentColor provides if (isUser) AmberPrimary else MaterialTheme.colorScheme.onSurface
-                            ) {
-                                if (action == null) {
-                                    MarkdownText(visibleContent)
-                                } else {
-                                    Text(visibleContent, fontWeight = FontWeight.Bold)
-                                }
+                Box(
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        val action = message.action
+                        CompositionLocalProvider(
+                            LocalContentColor provides if (isUser) AmberPrimary else MaterialTheme.colorScheme.onSurface
+                        ) {
+                            if (action == null) {
+                                MarkdownText(visibleContent)
+                            } else {
+                                Text(visibleContent, fontWeight = FontWeight.Bold)
                             }
-                            
-                            if (action is DmAction.OpenDm && onOpenDm != null) {
-                                Button(
-                                    onClick = { onOpenDm(action.serverId, action.nodeId, action.nodeName) },
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = AmberPrimary)
-                                ) {
-                                    Text("Enter DM", fontWeight = FontWeight.Black)
-                                }
+                        }
+                        
+                        if (action is DmAction.OpenDm && onOpenDm != null) {
+                            Button(
+                                onClick = { onOpenDm(action.serverId, action.nodeId, action.nodeName) },
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = AmberPrimary)
+                            ) {
+                                Text("Enter DM", fontWeight = FontWeight.Black)
                             }
                         }
                     }

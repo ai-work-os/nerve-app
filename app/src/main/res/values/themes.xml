@@ -1,3 +1,15 @@
 <resources>
-    <style name="Theme.NerveApp" parent="Theme.Material3.DayNight.NoActionBar" />
+    <style name="Theme.NerveApp" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/cream_background</item>
+        <item name="android:statusBarColor">@color/cream_background</item>
+        <item name="android:navigationBarColor">@color/cream_background</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+    
+    <style name="Theme.NerveApp.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/cream_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="postSplashScreenTheme">@style/Theme.NerveApp</item>
+    </style>
 </resources>
