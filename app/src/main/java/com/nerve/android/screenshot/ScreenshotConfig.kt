@@ -8,7 +8,7 @@ class ScreenshotConfig(context: Context) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences("screenshot_config", Context.MODE_PRIVATE)
 
-    /** Base URL of the screenshot plugin HTTP server, e.g. http://100.75.43.90:4811 */
+    /** Base URL of the screenshot plugin HTTP server, e.g. http://100.75.43.90:4812 */
     var uploadUrl: String
         get() = prefs.getString("upload_url", DEFAULT_UPLOAD_URL) ?: DEFAULT_UPLOAD_URL
         set(v) { prefs.edit().putString("upload_url", v).apply() }
@@ -23,6 +23,6 @@ class ScreenshotConfig(context: Context) {
         get() = (Build.MODEL ?: "android").replace(Regex("[^A-Za-z0-9_-]"), "-")
 
     companion object {
-        const val DEFAULT_UPLOAD_URL = "http://100.75.43.90:4811"
+        const val DEFAULT_UPLOAD_URL = "http://100.75.43.90:4812"
     }
 }
