@@ -149,6 +149,8 @@ fun AppRoute(app: NerveApp) {
                             onRemoveServer = { scope.launch { serverViewModel.removeServer(it) } },
                             onReorder = { scope.launch { serverViewModel.reorderServers(it) } },
                             onBack = { nav.back() },
+                            onCheckUpdate = { updateViewModel.refresh() },
+                            versionName = com.nerve.android.BuildConfig.VERSION_NAME,
                         )
                     }
 

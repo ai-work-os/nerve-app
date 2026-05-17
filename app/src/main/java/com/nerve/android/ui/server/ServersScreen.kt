@@ -40,6 +40,8 @@ fun ServersScreen(
     onRemoveServer: (serverId: String) -> Unit,
     onReorder: (orderedIds: List<String>) -> Unit,
     onBack: () -> Unit,
+    onCheckUpdate: () -> Unit,
+    versionName: String,
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
 
@@ -67,6 +69,43 @@ fun ServersScreen(
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp)) {
             
+            // --- NEW: App Update Section ---
+            Text(
+                text = "Maintenance",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 2.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+            )
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(20.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Current Version", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                        Text("v$versionName", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Button(
+                        onClick = onCheckUpdate,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = AmberPrimary)
+                    ) {
+                        Icon(Icons.Default.Update, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Check Now", fontWeight = FontWeight.Black)
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+
             Text(
                 text = "Primary Infrastructure",
                 style = MaterialTheme.typography.labelSmall,
