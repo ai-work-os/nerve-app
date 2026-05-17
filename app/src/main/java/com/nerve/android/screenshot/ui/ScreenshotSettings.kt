@@ -29,6 +29,7 @@ fun ScreenshotSettings() {
     val config = remember { ScreenshotConfig(ctx) }
 
     var enabled by remember { mutableStateOf(config.enabled) }
+    var autoSend by remember { mutableStateOf(config.autoSend) }
     var uploadUrl by remember { mutableStateOf(config.uploadUrl) }
     // Survives configuration changes (rotation) so the denial hint is not lost.
     var permissionDenied by rememberSaveable { mutableStateOf(false) }
@@ -108,6 +109,29 @@ fun ScreenshotSettings() {
                             )
                             Logger.debug("ScreenshotSettings", "watcher_stopped")
                         }
+                    },
+                )
+            }
+
+            // Auto-send toggle — only meaningful while watcher is enabled
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    "截屏后自动发送（关闭则每次弹通知确认）",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(
+                    checked = autoSend,
+                    onCheckedChange = { want ->
+                        config.autoSend = want
+                        autoSend = want
+                        Logger.debug("ScreenshotSettings", "auto_send_changed",
+                            mapOf("autoSend" to want))
                     },
                 )
             }

@@ -6,12 +6,9 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.ContentUris
 import android.content.Intent
-import android.database.ContentObserver
 import android.net.Uri
 import android.os.Build
-import android.os.Handler
 import android.os.IBinder
-import android.os.Looper
 import android.provider.MediaStore
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
@@ -22,8 +19,12 @@ import okhttp3.OkHttpClient
 import kotlin.math.abs
 
 /**
- * Foreground service that watches MediaStore for new screenshots and offers to
- * upload them to the `screenshot` plugin.
+ * Foreground service that watches MediaStore for new screenshots and either
+ * uploads them automatically (autoSend=true) or offers a confirm notification.
+ *
+ * Detection uses a 3-second polling loop rather than ContentObserver because
+ * ColorOS/OPPO (Android 16) freezes the app and stops delivering onChange
+ * callbacks while the foreground service is still alive.
  *
  * NOTE — architectural limit: this runs as a `dataSync` foreground service. On
  * API 34+ the OS force-stops a `dataSync` FGS after ~6 hours of cumulative
@@ -43,25 +44,16 @@ class ScreenshotWatcherService : Service() {
         const val ACTION_STOP = "com.nerve.android.screenshot.STOP"
         const val EXTRA_URI = "screenshot_uri"
         const val EXTRA_NOTIF_ID = "screenshot_notif_id"
+
+        private const val POLL_INTERVAL_MS = 3_000L
     }
 
     private lateinit var config: ScreenshotConfig
     private lateinit var uploader: ScreenshotUploader
     private lateinit var seenUris: SeenUris
     private var serviceStartedAtSec: Long = 0L
-    private var observerRegistered = false
-
-    private val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
-        override fun onChange(selfChange: Boolean, uri: Uri?) {
-            if (uri == null) return
-            Logger.debug("ScreenshotWatcherService", "observer_change", mapOf("uri" to uri.toString()))
-            Thread { checkForScreenshot(uri) }.also {
-                it.name = "screenshot-check-thread"
-                it.isDaemon = true
-                it.start()
-            }
-        }
-    }
+    private var pollingActive = false
+    private var pollThread: Thread? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -103,26 +95,40 @@ class ScreenshotWatcherService : Service() {
         // startForeground must run on every onStartCommand to satisfy the FGS contract.
         startForeground(NOTI_ID, buildPersistentNotification())
         // Idempotency guard: a rapid toggle / repeated startForegroundService delivers
-        // another onStartCommand; without this we leak a second ContentObserver and
-        // every onChange would fire twice.
-        if (observerRegistered) {
+        // another onStartCommand; without this we'd start a second polling thread.
+        if (pollingActive) {
             Logger.debug("ScreenshotWatcherService", "watcher_already_running")
             return
         }
-        Logger.debug("ScreenshotWatcherService", "watcher_start", mapOf("uploadUrl" to config.uploadUrl))
-        contentResolver.registerContentObserver(
-            MediaStore.Images.Media.EXTERNAL_CONTENT_URI, true, observer
-        )
-        observerRegistered = true
-        Logger.debug("ScreenshotWatcherService", "observer_registered")
+        Logger.debug("ScreenshotWatcherService", "watcher_start",
+            mapOf("uploadUrl" to config.uploadUrl, "pollIntervalMs" to POLL_INTERVAL_MS))
+        pollingActive = true
+
+        val t = Thread {
+            Logger.debug("ScreenshotWatcherService", "poll_loop_started")
+            while (pollingActive && !Thread.currentThread().isInterrupted) {
+                try {
+                    Thread.sleep(POLL_INTERVAL_MS)
+                } catch (_: InterruptedException) {
+                    break
+                }
+                if (pollingActive && !Thread.currentThread().isInterrupted) {
+                    pollForScreenshots()
+                }
+            }
+            Logger.debug("ScreenshotWatcherService", "poll_loop_exited")
+        }
+        t.name = "screenshot-poll-thread"
+        t.isDaemon = true
+        t.start()
+        pollThread = t
     }
 
     private fun stopWatcher() {
         Logger.debug("ScreenshotWatcherService", "watcher_stop")
-        if (observerRegistered) {
-            contentResolver.unregisterContentObserver(observer)
-            observerRegistered = false
-        }
+        pollingActive = false
+        pollThread?.interrupt()
+        pollThread = null
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
         Logger.debug("ScreenshotWatcherService", "watcher_stopped")
@@ -138,10 +144,9 @@ class ScreenshotWatcherService : Service() {
     override fun onTimeout(startId: Int) {
         Logger.warn("ScreenshotWatcherService", "fgs_timeout", mapOf("startId" to startId))
         postTimeoutNotification()
-        if (observerRegistered) {
-            contentResolver.unregisterContentObserver(observer)
-            observerRegistered = false
-        }
+        pollingActive = false
+        pollThread?.interrupt()
+        pollThread = null
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf(startId)
     }
@@ -162,13 +167,12 @@ class ScreenshotWatcherService : Service() {
         Logger.debug("ScreenshotWatcherService", "timeout_notif_posted")
     }
 
-    private fun checkForScreenshot(uri: Uri) {
-        val uriStr = uri.toString()
-        if (!seenUris.firstTimeFor(uriStr)) {
-            Logger.debug("ScreenshotWatcherService", "uri_duplicate_skip", mapOf("uri" to uriStr))
-            return
-        }
-
+    /**
+     * Queries MediaStore for images added since the service started. Iterates all
+     * new rows (not just moveToFirst) so screenshots taken between polls are not
+     * missed. Each candidate is deduped by content URI and checked via isScreenshot.
+     */
+    private fun pollForScreenshots() {
         val projection = arrayOf(
             MediaStore.Images.Media.RELATIVE_PATH,
             MediaStore.Images.Media.BUCKET_DISPLAY_NAME,
@@ -176,64 +180,156 @@ class ScreenshotWatcherService : Service() {
             MediaStore.Images.Media.MIME_TYPE,
             MediaStore.Images.Media._ID,
         )
-
-        // Query the specific uri when onChange delivered one; otherwise fall back
-        // to the collection and restrict to images added since the service started
-        // (a generic onChange gives no row id — without the selection the newest
-        // row could be any recent image, not the screenshot that triggered us).
-        val isSpecificUri =
-            uri.toString().contains("images/media/") && uri.lastPathSegment?.toLongOrNull() != null
-        val queryUri = if (isSpecificUri) uri else MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-        val selection = if (isSpecificUri) null else "${MediaStore.Images.Media.DATE_ADDED} >= ?"
-        val selectionArgs = if (isSpecificUri) null else arrayOf(serviceStartedAtSec.toString())
+        val selection = "${MediaStore.Images.Media.DATE_ADDED} >= ?"
+        val selectionArgs = arrayOf(serviceStartedAtSec.toString())
 
         contentResolver.query(
-            queryUri, projection, selection, selectionArgs,
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            projection,
+            selection,
+            selectionArgs,
             "${MediaStore.Images.Media.DATE_ADDED} DESC",
         )?.use { cursor ->
-            if (!cursor.moveToFirst()) return@use
+            while (cursor.moveToNext()) {
+                val relativePath = cursor.getString(
+                    cursor.getColumnIndexOrThrow(MediaStore.Images.Media.RELATIVE_PATH))
+                val bucketName = cursor.getString(
+                    cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_DISPLAY_NAME))
+                val dateAdded = cursor.getLong(
+                    cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED))
+                val mimeType = cursor.getString(
+                    cursor.getColumnIndexOrThrow(MediaStore.Images.Media.MIME_TYPE))
+                val id = cursor.getLong(
+                    cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID))
 
-            val relativePath = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Images.Media.RELATIVE_PATH))
-            val bucketName = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_DISPLAY_NAME))
-            val dateAdded = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED))
-            val mimeType = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Images.Media.MIME_TYPE))
-            val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID))
+                val imageUri = ContentUris.withAppendedId(
+                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
+                val imageUriStr = imageUri.toString()
 
-            Logger.debug("ScreenshotWatcherService", "image_query_result", mapOf(
-                "relativePath" to relativePath,
-                "bucketName" to bucketName,
-                "dateAdded" to dateAdded,
-                "serviceStartedAt" to serviceStartedAtSec,
-                "mimeType" to mimeType,
-            ))
+                // Dedup by content URI first — skip rows we've already handled
+                if (!seenUris.firstTimeFor(imageUriStr)) continue
 
-            // Only accept images added after service started, and only screenshots
-            if (dateAdded < serviceStartedAtSec) {
-                Logger.debug("ScreenshotWatcherService", "image_too_old_skip", mapOf("dateAdded" to dateAdded))
-                return@use
+                // Skip images that predate service start (belt-and-suspenders
+                // in case the DATE_ADDED selection is slightly off on some ROMs)
+                if (dateAdded < serviceStartedAtSec) {
+                    Logger.debug("ScreenshotWatcherService", "image_too_old_skip",
+                        mapOf("dateAdded" to dateAdded))
+                    continue
+                }
+
+                if (!isScreenshot(relativePath, bucketName)) {
+                    Logger.debug("ScreenshotWatcherService", "not_screenshot_skip",
+                        mapOf("relativePath" to relativePath))
+                    continue
+                }
+
+                Logger.debug("ScreenshotWatcherService", "screenshot_detected", mapOf(
+                    "uri" to imageUriStr,
+                    "relativePath" to relativePath,
+                    "mime" to mimeType,
+                ))
+
+                handleDetectedScreenshot(imageUriStr, mimeType)
             }
+        }
+    }
 
-            if (!isScreenshot(relativePath, bucketName)) {
-                Logger.debug("ScreenshotWatcherService", "not_screenshot_skip", mapOf("relativePath" to relativePath))
-                return@use
+    /**
+     * Branches on autoSend config:
+     * - autoSend == true: upload immediately on a background thread; post a brief
+     *   success notification on success, or the retry notification on failure.
+     * - autoSend == false: post the confirm notification with [发到电脑] / [忽略].
+     */
+    private fun handleDetectedScreenshot(imageUriStr: String, mimeType: String) {
+        if (config.autoSend) {
+            Thread {
+                uploadAndNotify(imageUriStr)
+            }.also {
+                it.name = "screenshot-upload-thread"
+                it.isDaemon = true
+                it.start()
             }
-
-            // Build the content URI for the specific image
-            val imageUri = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
-            val imageUriStr = imageUri.toString()
-
-            // Deduplicate by content URI
-            if (!seenUris.firstTimeFor(imageUriStr)) {
-                Logger.debug("ScreenshotWatcherService", "content_uri_duplicate_skip", mapOf("uri" to imageUriStr))
-                return@use
-            }
-
-            Logger.debug("ScreenshotWatcherService", "screenshot_detected", mapOf(
-                "uri" to imageUriStr, "relativePath" to relativePath, "mime" to mimeType,
-            ))
-
+        } else {
             postScreenshotNotification(imageUriStr, mimeType)
         }
+    }
+
+    /**
+     * Uploads the image at [uriStr] immediately.
+     * On success, posts a brief auto-dismissing success notification.
+     * On failure, posts the retry notification (same as the manual send path).
+     */
+    private fun uploadAndNotify(uriStr: String) {
+        val notifId = NOTI_ID + 1 + (abs(uriStr.hashCode()) % 50_000)
+        Logger.debug("ScreenshotWatcherService", "auto_upload_start", mapOf("uri" to uriStr))
+
+        val ok = doUpload(uriStr)
+        if (ok) {
+            val successNotif = NotificationCompat.Builder(this, CHANNEL_ALERTS_ID)
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setContentTitle("✅ 截图已发到电脑")
+                .setAutoCancel(true)
+                .setTimeoutAfter(5_000)
+                .build()
+            getSystemService(NotificationManager::class.java).notify(notifId, successNotif)
+            Logger.debug("ScreenshotWatcherService", "auto_upload_success", mapOf("uri" to uriStr))
+        } else {
+            Logger.warn("ScreenshotWatcherService", "auto_upload_failed", mapOf("uri" to uriStr))
+            postRetryNotification(uriStr, notifId)
+        }
+    }
+
+    /**
+     * Core upload logic shared by the auto-send path and the manual ACTION_SEND path.
+     * Returns true on success.
+     */
+    private fun doUpload(uriStr: String): Boolean {
+        val uri = Uri.parse(uriStr)
+        val bytes = try {
+            contentResolver.openInputStream(uri)?.use { it.readBytes() }
+        } catch (e: Exception) {
+            Logger.warn("ScreenshotWatcherService", "read_bytes_fail",
+                mapOf("reason" to e.message), e)
+            null
+        }
+
+        if (bytes == null) {
+            Logger.warn("ScreenshotWatcherService", "upload_abort_no_bytes",
+                mapOf("uri" to uriStr))
+            return false
+        }
+
+        val mime = contentResolver.getType(uri) ?: "image/png"
+        val takenAtMs = System.currentTimeMillis()
+
+        return uploader.upload(
+            baseUrl = config.uploadUrl,
+            imageBytes = bytes,
+            mimeType = mime,
+            source = config.deviceName,
+            analyze = false,
+            takenAtMs = takenAtMs,
+        )
+    }
+
+    private fun postRetryNotification(uriStr: String, notifId: Int) {
+        val retryIntent = Intent(this, ScreenshotWatcherService::class.java).apply {
+            action = ACTION_SEND
+            putExtra(EXTRA_URI, uriStr)
+            putExtra(EXTRA_NOTIF_ID, notifId)
+        }
+        val retryPi = PendingIntent.getService(
+            this, notifId,
+            retryIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val failNotif = NotificationCompat.Builder(this, CHANNEL_ALERTS_ID)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle("发送失败，点击重试")
+            .setContentIntent(retryPi)
+            .setAutoCancel(true)
+            .build()
+        getSystemService(NotificationManager::class.java).notify(notifId, failNotif)
     }
 
     private fun postScreenshotNotification(uriStr: String, mimeType: String) {
@@ -273,60 +369,21 @@ class ScreenshotWatcherService : Service() {
             .build()
 
         getSystemService(NotificationManager::class.java).notify(notifId, notif)
-        Logger.debug("ScreenshotWatcherService", "screenshot_notif_posted", mapOf("notifId" to notifId, "uri" to uriStr))
+        Logger.debug("ScreenshotWatcherService", "screenshot_notif_posted",
+            mapOf("notifId" to notifId, "uri" to uriStr))
     }
 
     private fun handleSend(uriStr: String, notifId: Int) {
-        val uri = Uri.parse(uriStr)
         Logger.debug("ScreenshotWatcherService", "upload_start", mapOf("uri" to uriStr))
-
-        val bytes = try {
-            contentResolver.openInputStream(uri)?.use { it.readBytes() }
-        } catch (e: Exception) {
-            Logger.warn("ScreenshotWatcherService", "read_bytes_fail", mapOf("reason" to e.message), e)
-            null
-        }
-
-        if (bytes == null) {
-            Logger.warn("ScreenshotWatcherService", "upload_abort_no_bytes", mapOf("uri" to uriStr))
-            return
-        }
-
-        val mime = contentResolver.getType(uri) ?: "image/png"
-        val takenAtMs = System.currentTimeMillis()
-
-        val ok = uploader.upload(
-            baseUrl = config.uploadUrl,
-            imageBytes = bytes,
-            mimeType = mime,
-            source = config.deviceName,
-            analyze = false,
-            takenAtMs = takenAtMs,
-        )
-
+        val ok = doUpload(uriStr)
         if (ok) {
             getSystemService(NotificationManager::class.java).cancel(notifId)
-            Logger.debug("ScreenshotWatcherService", "upload_success_notif_cancelled", mapOf("notifId" to notifId))
+            Logger.debug("ScreenshotWatcherService", "upload_success_notif_cancelled",
+                mapOf("notifId" to notifId))
         } else {
-            Logger.warn("ScreenshotWatcherService", "upload_failed", mapOf("notifId" to notifId, "uri" to uriStr))
-            // Update notification to show failure
-            val retryIntent = Intent(this, ScreenshotWatcherService::class.java).apply {
-                action = ACTION_SEND
-                putExtra(EXTRA_URI, uriStr)
-                putExtra(EXTRA_NOTIF_ID, notifId)
-            }
-            val retryPi = PendingIntent.getService(
-                this, notifId,
-                retryIntent,
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-            )
-            val failNotif = NotificationCompat.Builder(this, CHANNEL_ALERTS_ID)
-                .setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle("发送失败，点击重试")
-                .setContentIntent(retryPi)
-                .setAutoCancel(true)
-                .build()
-            getSystemService(NotificationManager::class.java).notify(notifId, failNotif)
+            Logger.warn("ScreenshotWatcherService", "upload_failed",
+                mapOf("notifId" to notifId, "uri" to uriStr))
+            postRetryNotification(uriStr, notifId)
         }
     }
 
@@ -358,10 +415,9 @@ class ScreenshotWatcherService : Service() {
 
     override fun onDestroy() {
         Logger.debug("ScreenshotWatcherService", "service_destroy")
-        if (observerRegistered) {
-            contentResolver.unregisterContentObserver(observer)
-            observerRegistered = false
-        }
+        pollingActive = false
+        pollThread?.interrupt()
+        pollThread = null
         super.onDestroy()
     }
 }

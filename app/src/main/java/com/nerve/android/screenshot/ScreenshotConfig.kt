@@ -22,6 +22,15 @@ class ScreenshotConfig(context: Context) {
     val deviceName: String
         get() = (Build.MODEL ?: "android").replace(Regex("[^A-Za-z0-9_-]"), "-")
 
+    /**
+     * When true (default), screenshots are uploaded immediately without a
+     * confirmation notification. When false, the old confirm-first behavior
+     * is used (notification with [发到电脑] / [忽略] buttons).
+     */
+    var autoSend: Boolean
+        get() = prefs.getBoolean("auto_send", true)
+        set(v) { prefs.edit().putBoolean("auto_send", v).apply() }
+
     companion object {
         const val DEFAULT_UPLOAD_URL = "http://100.75.43.90:4812"
     }
