@@ -81,11 +81,43 @@ fun AppRoute(app: NerveApp) {
             Box(modifier = Modifier.fillMaxSize()) {
                 when (val current = nav.screen) {
                     AppScreen.Main -> {
-                        Column(modifier = Modifier.fillMaxSize()) {
-                            // Update Banner
-                            (updateState as? UpdateState.Available)
-                                ?.takeIf { it.info.versionCode != dismissedVersion }
-                                ?.let { available ->
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            Column(modifier = Modifier.fillMaxSize()) {
+                                // Main Content with Fade
+                                Box(modifier = Modifier.weight(1f)) {
+                                    AnimatedContent(
+                                        targetState = nav.selectedTab,
+                                        label = "tab_fade",
+                                        transitionSpec = {
+                                            fadeIn(animationSpec = tween(500)) togetherWith fadeOut(animationSpec = tween(500))
+                                        }
+                                    ) { tab ->
+                                        when (tab) {
+                                            0 -> NodesRoute(
+                                                viewModel = nodesViewModel,
+                                                serverRegistry = app.serverRegistry,
+                                                onOpenChat = { s, n, name -> nav.openChat(s, n, name) },
+                                                onOpenServers = { nav.openServers() },
+                                            )
+                                            1 -> ChannelsRoute(
+                                                viewModel = channelsViewModel,
+                                                onOpenChannel = { s, c, name -> nav.openChannelChat(s, c, name) },
+                                            )
+                                            2 -> LifeLogScreen(vm = lifeLogViewModel)
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Update Banner - Floating Overlay
+                            AnimatedVisibility(
+                                visible = (updateState as? UpdateState.Available)?.let { it.info.versionCode != dismissedVersion } ?: false,
+                                enter = slideInVertically { -it } + fadeIn(),
+                                exit = slideOutVertically { -it } + fadeOut(),
+                                modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding()
+                            ) {
+                                val available = updateState as? UpdateState.Available
+                                if (available != null) {
                                     UpdateBanner(
                                         info = available.info,
                                         download = downloadState,
@@ -102,39 +134,15 @@ fun AppRoute(app: NerveApp) {
                                         onRetry = { updateViewModel.startDownload() },
                                     )
                                 }
-
-                            // Main Content with Fade
-                            Box(modifier = Modifier.weight(1f)) {
-                                AnimatedContent(
-                                    targetState = nav.selectedTab,
-                                    label = "tab_fade",
-                                    transitionSpec = {
-                                        fadeIn(animationSpec = tween(500)) togetherWith fadeOut(animationSpec = tween(500))
-                                    }
-                                ) { tab ->
-                                    when (tab) {
-                                        0 -> NodesRoute(
-                                            viewModel = nodesViewModel,
-                                            serverRegistry = app.serverRegistry,
-                                            onOpenChat = { s, n, name -> nav.openChat(s, n, name) },
-                                            onOpenServers = { nav.openServers() },
-                                        )
-                                        1 -> ChannelsRoute(
-                                            viewModel = channelsViewModel,
-                                            onOpenChannel = { s, c, name -> nav.openChannelChat(s, c, name) },
-                                        )
-                                        2 -> LifeLogScreen(vm = lifeLogViewModel)
-                                    }
-                                }
                             }
-                        }
 
-                        // Floating Navigation Bar
-                        FloatingPillNavigationBar(
-                            selectedTab = nav.selectedTab,
-                            onTabSelected = { nav.selectTab(it) },
-                            modifier = Modifier.align(Alignment.BottomCenter)
-                        )
+                            // Floating Navigation Bar
+                            FloatingPillNavigationBar(
+                                selectedTab = nav.selectedTab,
+                                onTabSelected = { nav.selectTab(it) },
+                                modifier = Modifier.align(Alignment.BottomCenter)
+                            )
+                        }
                     }
 
                     is AppScreen.Servers -> {

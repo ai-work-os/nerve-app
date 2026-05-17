@@ -18,6 +18,21 @@ import androidx.compose.ui.unit.dp
 import com.nerve.android.update.AppVersionInfo
 import com.nerve.android.update.DownloadState
 
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.nerve.android.update.AppVersionInfo
+import com.nerve.android.update.DownloadState
+import com.nerve.android.ui.theme.AmberPrimary
+import com.nerve.android.ui.theme.StoneMain
+
 @Composable
 fun UpdateBanner(
     info: AppVersionInfo,
@@ -25,70 +40,111 @@ fun UpdateBanner(
     onUpdate: () -> Unit,
     onDismiss: () -> Unit,
     onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = Modifier
+    Surface(
+        modifier = modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.primaryContainer)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        shape = RoundedCornerShape(28.dp),
+        color = StoneMain,
+        tonalElevation = 8.dp,
+        shadowElevation = 12.dp,
+        border = androidx.compose.foundation.BorderStroke(1.dp, AmberPrimary.copy(alpha = 0.2f))
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
+        Column(
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(
-                    "新版本 v${info.versionName}",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-                val subtitle = when (download) {
-                    is DownloadState.Idle -> info.notes?.takeIf { it.isNotBlank() }
-                    is DownloadState.InProgress -> {
-                        val mb = download.downloaded / 1_000_000
-                        val totalMb = (download.total.takeIf { it > 0 } ?: 0) / 1_000_000
-                        if (totalMb > 0) "下载中 ${mb}MB / ${totalMb}MB" else "下载中 ${mb}MB"
-                    }
-                    is DownloadState.Ready -> "下载完成，启动安装"
-                    is DownloadState.Failed -> "下载失败：${download.reason ?: "未知错误"}"
-                }
-                subtitle?.let {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        it,
+                        text = "System Update Available",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Black,
+                        color = AmberPrimary,
+                        letterSpacing = 1.sp
+                    )
+                    Text(
+                        text = "Version v${info.versionName}",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    
+                    val statusText = when (download) {
+                        is DownloadState.Idle -> info.notes?.takeIf { it.isNotBlank() } ?: "New features and optimizations"
+                        is DownloadState.InProgress -> {
+                            val mb = download.downloaded / 1_000_000
+                            val totalMb = (download.total.takeIf { it > 0 } ?: 0) / 1_000_000
+                            if (totalMb > 0) "Synchronizing: ${mb}MB / ${totalMb}MB" else "Synchronizing: ${mb}MB"
+                        }
+                        is DownloadState.Ready -> "Extraction complete. Ready to install."
+                        is DownloadState.Failed -> "Transmission failed: ${download.reason ?: "Unknown"}"
+                    }
+                    
+                    Text(
+                        text = statusText,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        color = Color.White.copy(alpha = 0.6f),
+                        maxLines = 1
                     )
                 }
+
+                when (download) {
+                    is DownloadState.Idle -> {
+                        TextButton(onClick = onDismiss) { 
+                            Text("Later", color = Color.White.copy(alpha = 0.5f)) 
+                        }
+                        Button(
+                            onClick = onUpdate,
+                            colors = ButtonDefaults.buttonColors(containerColor = AmberPrimary),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 16.dp)
+                        ) {
+                            Text("Update", fontWeight = FontWeight.Black, color = StoneMain)
+                        }
+                    }
+                    is DownloadState.InProgress -> {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = AmberPrimary,
+                            strokeWidth = 3.dp
+                        )
+                    }
+                    is DownloadState.Ready -> {
+                        Button(
+                            onClick = onUpdate,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Install", fontWeight = FontWeight.Black, color = StoneMain)
+                        }
+                    }
+                    is DownloadState.Failed -> {
+                        IconButton(onClick = onRetry) {
+                            Icon(androidx.compose.material.icons.Icons.Default.Refresh, contentDescription = null, tint = AmberPrimary)
+                        }
+                    }
+                }
             }
-            when (download) {
-                is DownloadState.Idle -> {
-                    TextButton(onClick = onDismiss) { Text("稍后") }
-                    Button(onClick = onUpdate) { Text("更新") }
+            
+            if (download is DownloadState.InProgress) {
+                val ratio = if (download.total > 0) {
+                    (download.downloaded.toFloat() / download.total).coerceIn(0f, 1f)
+                } else null
+                
+                if (ratio != null) {
+                    LinearProgressIndicator(
+                        progress = { ratio },
+                        modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
+                        color = AmberPrimary,
+                        trackColor = Color.White.copy(alpha = 0.1f)
+                    )
                 }
-                is DownloadState.InProgress -> {
-                    TextButton(onClick = onDismiss) { Text("取消") }
-                }
-                is DownloadState.Ready -> {
-                    Button(onClick = onUpdate) { Text("安装") }
-                }
-                is DownloadState.Failed -> {
-                    TextButton(onClick = onDismiss) { Text("关闭") }
-                    Button(onClick = onRetry) { Text("重试") }
-                }
-            }
-        }
-        if (download is DownloadState.InProgress) {
-            val ratio = if (download.total > 0) {
-                (download.downloaded.toFloat() / download.total).coerceIn(0f, 1f)
-            } else null
-            if (ratio != null) {
-                LinearProgressIndicator(
-                    progress = { ratio },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            } else {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
         }
     }
