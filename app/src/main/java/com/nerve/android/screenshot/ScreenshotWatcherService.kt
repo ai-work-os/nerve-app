@@ -45,6 +45,11 @@ class ScreenshotWatcherService : Service() {
         const val EXTRA_URI = "screenshot_uri"
         const val EXTRA_NOTIF_ID = "screenshot_notif_id"
 
+        // Shared id for the "sent" success toast — fixed so each new success
+        // replaces the previous one (no pile-up). Sits outside the per-image
+        // notifId range [NOTI_ID+1, NOTI_ID+50001].
+        const val SUCCESS_NOTI_ID = NOTI_ID + 60_000
+
         private const val POLL_INTERVAL_MS = 3_000L
     }
 
@@ -267,13 +272,16 @@ class ScreenshotWatcherService : Service() {
 
         val ok = doUpload(uriStr)
         if (ok) {
+            // 60s timeout (not 5s): when shooting with the camera, the camera
+            // app is full-screen and hides the notification — a 5s notification
+            // is gone before the user exits the camera. 60s survives that.
             val successNotif = NotificationCompat.Builder(this, CHANNEL_ALERTS_ID)
                 .setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle("✅ 截图已发到电脑")
+                .setContentTitle("✅ 已发到电脑")
                 .setAutoCancel(true)
-                .setTimeoutAfter(5_000)
+                .setTimeoutAfter(60_000)
                 .build()
-            getSystemService(NotificationManager::class.java).notify(notifId, successNotif)
+            getSystemService(NotificationManager::class.java).notify(SUCCESS_NOTI_ID, successNotif)
             Logger.debug("ScreenshotWatcherService", "auto_upload_success", mapOf("uri" to uriStr))
         } else {
             Logger.warn("ScreenshotWatcherService", "auto_upload_failed", mapOf("uri" to uriStr))
