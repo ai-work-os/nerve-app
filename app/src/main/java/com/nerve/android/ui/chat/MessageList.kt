@@ -49,8 +49,22 @@ fun MessageList(
         messages.filter { it.textContent.isNotBlank() || it.blocks.isNotEmpty() }
     }
     val listState = rememberLazyListState()
+    var hasScrolledToBottomInitially by remember { mutableStateOf(false) }
 
+    // Initial scroll to bottom
+    LaunchedEffect(visibleMessages.isNotEmpty()) {
+        if (visibleMessages.isNotEmpty() && !hasScrolledToBottomInitially) {
+            val extra = if (isStreaming) 1 else 0
+            val target = (visibleMessages.size + extra - 1).coerceAtLeast(0)
+            listState.scrollToItem(target)
+            hasScrolledToBottomInitially = true
+        }
+    }
+
+    // Auto-scroll for new messages or streaming
     LaunchedEffect(visibleMessages.size, isStreaming, streamingText, streamingBlocks) {
+        if (!hasScrolledToBottomInitially) return@LaunchedEffect
+        
         val extra = if (isStreaming) 1 else 0
         val target = (visibleMessages.size + extra - 1).coerceAtLeast(0)
         

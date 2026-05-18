@@ -4,10 +4,12 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -54,6 +56,7 @@ fun NodesScreen(
     onSpawn: (String, String, String?, String?) -> Unit,
     initialShowSpawnDialog: Boolean = false,
     onShowSpawnDialogChange: ((Boolean) -> Unit)? = null,
+    gridState: LazyStaggeredGridState = rememberLazyStaggeredGridState(),
 ) {
     var internalShowSpawn by remember { mutableStateOf(initialShowSpawnDialog) }
     val showSpawn = onShowSpawnDialogChange?.let { initialShowSpawnDialog } ?: internalShowSpawn
@@ -141,27 +144,28 @@ fun NodesScreen(
                     Text("No agents deployed", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else {
-                val grouped = groupNodesByServer(state.items, servers)
+                val groups = groupNodesByServer(state.items, servers)
 
                 LazyVerticalStaggeredGrid(
+                    state = gridState,
                     columns = StaggeredGridCells.Adaptive(minSize = 160.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalItemSpacing = 16.dp,
                     contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 120.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    grouped.forEach { (server, nodes) ->
-                        item(key = "header:${server.id}", span = StaggeredGridItemSpan.FullLine) {
+                    groups.forEach { group ->
+                        item(key = "header:${group.title}", span = StaggeredGridItemSpan.FullLine) {
                             Text(
-                                text = server.name.uppercase(),
+                                text = group.title.uppercase(),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = if (group.isSpecial) AmberPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 2.sp,
                                 modifier = Modifier.padding(top = 24.dp, bottom = 8.dp)
                             )
                         }
-                        items(items = nodes, key = { "${it.serverId}:${it.nodeId}" }) { item ->
+                        items(items = group.nodes, key = { "${it.serverId}:${it.nodeId}" }) { item ->
                             NodeCard(
                                 item = item,
                                 onOpenChat = onOpenChat,

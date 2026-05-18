@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -46,6 +47,7 @@ fun AppRoute(app: NerveApp) {
     val downloadState by updateViewModel.download.collectAsState()
     val scope = rememberCoroutineScope()
     val nav = remember { AppNavigation() }
+    val nodesGridState = rememberLazyStaggeredGridState()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -96,6 +98,7 @@ fun AppRoute(app: NerveApp) {
                                             0 -> NodesRoute(
                                                 viewModel = nodesViewModel,
                                                 serverRegistry = app.serverRegistry,
+                                                gridState = nodesGridState,
                                                 onOpenChat = { s, n, name -> nav.openChat(s, n, name) },
                                                 onOpenServers = { nav.openServers() },
                                             )

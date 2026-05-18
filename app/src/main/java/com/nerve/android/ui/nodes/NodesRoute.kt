@@ -1,5 +1,7 @@
 package com.nerve.android.ui.nodes
 
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -15,6 +17,7 @@ fun NodesRoute(
     serverRegistry: ServerRegistry,
     onOpenChat: (String, String, String) -> Unit,
     onOpenServers: () -> Unit,
+    gridState: LazyStaggeredGridState = rememberLazyStaggeredGridState(),
 ) {
     val state by viewModel.uiState.collectAsState()
     val servers by serverRegistry.servers.collectAsState()
@@ -27,6 +30,7 @@ fun NodesRoute(
     NodesScreen(
         state = state,
         servers = servers,
+        gridState = gridState,
         onRefresh = {
             scope.launch {
                 viewModel.refresh()
