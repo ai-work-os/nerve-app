@@ -12,6 +12,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.*
@@ -66,6 +67,9 @@ fun MarkdownText(content: String, modifier: Modifier = Modifier) {
             TextView(context).apply {
                 setTextColor(textColor)
                 tag = markwon
+                isClickable = false
+                isLongClickable = false
+                movementMethod = null
             }
         },
         update = { textView ->
@@ -113,7 +117,7 @@ fun MessageBubble(
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         clipboard.setPrimaryClip(ClipData.newPlainText("message", visibleContent))
-        Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "Text copied to clipboard", Toast.LENGTH_SHORT).show()
     }
 
     Row(
@@ -164,11 +168,12 @@ fun MessageBubble(
                 shadowElevation = if (isUser) 4.dp else 1.dp,
                 border = if (!isUser) androidx.compose.foundation.BorderStroke(1.dp, AmberPrimary.copy(alpha = 0.1f)) else null,
                 modifier = Modifier
-                    .combinedClickable(onClick = {}, onLongClick = copyMessage)
                     .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
             ) {
                 Box(
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp)
+                    modifier = Modifier
+                        .combinedClickable(onClick = {}, onLongClick = copyMessage)
+                        .padding(horizontal = 20.dp, vertical = 14.dp)
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         val action = message.action
@@ -176,7 +181,9 @@ fun MessageBubble(
                             LocalContentColor provides if (isUser) AmberPrimary else MaterialTheme.colorScheme.onSurface
                         ) {
                             if (action == null) {
-                                MarkdownText(visibleContent)
+                                SelectionContainer {
+                                    MarkdownText(visibleContent)
+                                }
                             } else {
                                 Text(visibleContent, fontWeight = FontWeight.Bold)
                             }

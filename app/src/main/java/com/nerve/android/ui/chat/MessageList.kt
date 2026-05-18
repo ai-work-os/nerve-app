@@ -210,7 +210,7 @@ private fun ThinkingBlock(block: ContentBlock.Thinking, isLive: Boolean) {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     clipboard.setPrimaryClip(ClipData.newPlainText("thinking", block.text))
-                    Toast.makeText(context, "Copied thought", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
                 }
             )
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
@@ -256,7 +256,7 @@ private fun ToolCallBlock(block: ContentBlock.ToolCall) {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     clipboard.setPrimaryClip(ClipData.newPlainText("tool", block.toolName))
-                    Toast.makeText(context, "Copied tool name", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Tool name copied", Toast.LENGTH_SHORT).show()
                 }
             ),
         shape = RoundedCornerShape(12.dp),
