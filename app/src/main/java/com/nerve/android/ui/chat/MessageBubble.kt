@@ -43,6 +43,9 @@ import io.noties.markwon.ext.tables.TablePlugin
 
 import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.runtime.CompositionLocalProvider
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun MarkdownText(content: String, modifier: Modifier = Modifier) {
@@ -100,6 +103,7 @@ fun MessageBubble(
     message: DmMessage,
     testTag: String? = null,
     onOpenDm: ((String, String, String) -> Unit)? = null,
+    showAvatar: Boolean = true,
 ) {
     val isUser = message.role == DmRole.USER
     val context = LocalContext.current
@@ -113,12 +117,16 @@ fun MessageBubble(
     }
 
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
         verticalAlignment = Alignment.Top,
     ) {
         if (!isUser) {
-            SmallAvatar(label = message.nodeName.ifEmpty { "AI" }, isUser = false)
+            if (showAvatar) {
+                SmallAvatar(label = message.nodeName.ifEmpty { "AI" }, isUser = false)
+            } else {
+                Spacer(modifier = Modifier.width(32.dp))
+            }
             Spacer(modifier = Modifier.width(12.dp))
         }
 
@@ -126,23 +134,25 @@ fun MessageBubble(
             modifier = Modifier.weight(1f, fill = false),
             horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
         ) {
-            // Header Info
-            Row(
-                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = if (isUser) "Commander" else message.nodeName,
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Black,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = "• 12:45", // TODO: Real timestamp
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                )
+            // Header Info (Only show if avatar is shown)
+            if (showAvatar) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (isUser) "Commander" else message.nodeName.ifEmpty { "Assistant" },
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Black,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = if (message.timestamp > 0) formatTime(message.timestamp) else "just now",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                    )
+                }
             }
 
             // Message Surface (Bubble-less style)
@@ -191,4 +201,9 @@ fun MessageBubble(
             SmallAvatar(label = "CM", isUser = true)
         }
     }
+}
+
+private fun formatTime(timestamp: Long): String {
+    val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
+    return sdf.format(Date(timestamp * 1000))
 }

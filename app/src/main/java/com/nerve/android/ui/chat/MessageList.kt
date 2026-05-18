@@ -1,33 +1,36 @@
 package com.nerve.android.ui.chat
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.nerve.android.domain.dm.ContentBlock
 import com.nerve.android.domain.dm.DmMessage
 import com.nerve.android.domain.dm.DmRole
+import com.nerve.android.ui.theme.AmberPrimary
 import com.nerve.android.util.Logger
 
 @Composable
@@ -42,12 +45,7 @@ fun MessageList(
     onRetry: (String) -> Unit = {},
 ) {
     val visibleMessages = remember(messages) {
-        messages.mapNotNull { msg ->
-            val text = msg.textContent
-            val displayText = text.ifBlank { msg.content }
-            if (displayText.isBlank()) return@mapNotNull null
-            if (msg.role == DmRole.ASSISTANT && displayText != msg.content) msg.copy(content = displayText) else msg
-        }
+        messages.filter { it.textContent.isNotBlank() || it.blocks.isNotEmpty() }
     }
     val listState = rememberLazyListState()
 
@@ -55,13 +53,10 @@ fun MessageList(
         val extra = if (isStreaming) 1 else 0
         val target = (visibleMessages.size + extra - 1).coerceAtLeast(0)
         
-        // Only auto-scroll if the user is already looking at the bottom, 
-        // to avoid jumping while they read history.
         val isAtBottom = if (listState.layoutInfo.visibleItemsInfo.isEmpty()) true 
                         else listState.layoutInfo.visibleItemsInfo.last().index >= listState.layoutInfo.totalItemsCount - 2
         
         if (isAtBottom || isStreaming) {
-            Logger.debug("ChatScreen", "scroll_bottom", mapOf("count" to visibleMessages.size + extra))
             onAutoScroll?.invoke()
             listState.animateScrollToItem(target)
         }
@@ -76,93 +71,40 @@ fun MessageList(
             item {
                 Text(
                     "Start the conversation",
-                    modifier = Modifier.padding(vertical = 24.dp),
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 24.dp),
                     style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                 )
             }
         }
+        
         items(visibleMessages, key = { it.id }) { message ->
-            Column(modifier = Modifier.fillMaxWidth()) {
-                MessageBubble(message, onOpenDm = onOpenDm)
-                if (message.id in failedMessageIds) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 2.dp),
-                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            "✗ 发送失败",
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                        TextButton(onClick = { onRetry(message.id) }) { Text("重试") }
-                    }
-                }
-            }
+            MessageContent(message, onOpenDm, isFailed = message.id in failedMessageIds, onRetry = onRetry)
         }
+        
         if (isStreaming) {
-            if (streamingBlocks.isNotEmpty()) {
-                item("streaming-blocks") {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
+            item("streaming") {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    if (streamingBlocks.isNotEmpty()) {
                         streamingBlocks.forEach { block ->
-                            when (block) {
-                                is ContentBlock.Thinking -> {
-                                    ThinkingBlock(block, isLive = !block.completed)
-                                }
-                                is ContentBlock.ToolCall -> {
-                                    Text(
-                                        "Tool: ${block.toolName}",
-                                        modifier = Modifier
-                                            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
-                                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                    )
-                                }
-                                is ContentBlock.Text -> {
-                                    MessageBubble(
-                                        message = DmMessage(
-                                            id = "streaming",
-                                            role = DmRole.ASSISTANT,
-                                            content = block.text,
-                                            timestamp = 0L,
-                                            nodeId = "",
-                                            nodeName = "",
-                                        ),
-                                        testTag = "streaming-bubble-assistant",
-                                        onOpenDm = onOpenDm,
-                                    )
-                                }
-                            }
+                            RenderBlock(block, isStreaming = true, onOpenDm = onOpenDm)
                         }
+                    } else if (streamingText.isNotEmpty()) {
+                        MessageBubble(
+                            message = DmMessage("streaming", DmRole.ASSISTANT, streamingText, 0, "", ""),
+                            onOpenDm = onOpenDm
+                        )
+                    } else {
+                        Text(
+                            "Assistant is typing...",
+                            modifier = Modifier.padding(horizontal = 60.dp, vertical = 8.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
                     }
-                }
-            } else if (streamingText.isNotEmpty()) {
-                item("streaming") {
-                    MessageBubble(
-                        message = DmMessage(
-                            id = "streaming",
-                            role = DmRole.ASSISTANT,
-                            content = streamingText,
-                            timestamp = 0L,
-                            nodeId = "",
-                            nodeName = "",
-                        ),
-                        testTag = "streaming-bubble-assistant",
-                        onOpenDm = onOpenDm,
-                    )
-                }
-            } else {
-                item("typing") {
-                    Text(
-                        "Assistant is typing...",
-                        modifier = Modifier.padding(vertical = 8.dp),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
                 }
             }
         }
@@ -170,32 +112,158 @@ fun MessageList(
 }
 
 @Composable
+private fun MessageContent(
+    message: DmMessage,
+    onOpenDm: ((String, String, String) -> Unit)?,
+    isFailed: Boolean,
+    onRetry: (String) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        if (message.blocks.isNotEmpty()) {
+            message.blocks.forEachIndexed { index, block ->
+                RenderBlock(
+                    block = block,
+                    isStreaming = false,
+                    onOpenDm = onOpenDm,
+                    forceRole = message.role,
+                    forceName = message.nodeName,
+                    showAvatar = index == 0
+                )
+            }
+        } else {
+            MessageBubble(message, onOpenDm = onOpenDm)
+        }
+        
+        if (isFailed) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 60.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Transmission failed", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+                Spacer(Modifier.width(8.dp))
+                TextButton(onClick = { onRetry(message.id) }, contentPadding = PaddingValues(0.dp)) {
+                    Text("Retry", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RenderBlock(
+    block: ContentBlock,
+    isStreaming: Boolean = false,
+    onOpenDm: ((String, String, String) -> Unit)? = null,
+    forceRole: DmRole = DmRole.ASSISTANT,
+    forceName: String = "",
+    showAvatar: Boolean = true
+) {
+    when (block) {
+        is ContentBlock.Text -> {
+            MessageBubble(
+                message = DmMessage("blk", forceRole, block.text, 0, "", forceName),
+                onOpenDm = onOpenDm,
+                showAvatar = showAvatar
+            )
+        }
+        is ContentBlock.Thinking -> {
+            ThinkingBlock(block, isLive = isStreaming && !block.completed)
+        }
+        is ContentBlock.ToolCall -> {
+            ToolCallBlock(block)
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
 private fun ThinkingBlock(block: ContentBlock.Thinking, isLive: Boolean) {
     var expanded by remember { mutableStateOf(isLive) }
-    // Auto-expand while streaming
-    LaunchedEffect(isLive) {
-        if (isLive) expanded = true
-    }
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+
+    LaunchedEffect(isLive) { if (isLive) expanded = true }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { expanded = !expanded }
-            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(start = 60.dp, end = 24.dp, top = 2.dp, bottom = 2.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .combinedClickable(
+                onClick = { expanded = !expanded },
+                onLongClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("thinking", block.text))
+                    Toast.makeText(context, "Copied thought", Toast.LENGTH_SHORT).show()
+                }
+            )
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+            .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
-        Text(
-            if (expanded) "Thinking..." else "Thinking... (tap to expand)",
-            style = MaterialTheme.typography.labelMedium,
-            fontStyle = FontStyle.Italic,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (expanded) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                block.text,
+                text = if (expanded) "Thinking..." else "Thought (tap to expand)",
+                style = MaterialTheme.typography.labelSmall,
+                fontStyle = FontStyle.Italic,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            )
+            if (isLive) {
+                Spacer(Modifier.width(8.dp))
+                CircularProgressIndicator(modifier = Modifier.size(10.dp), strokeWidth = 1.dp, color = AmberPrimary)
+            }
+        }
+        if (expanded && block.text.isNotBlank()) {
+            Text(
+                text = block.text,
                 modifier = Modifier.padding(top = 4.dp),
                 style = MaterialTheme.typography.bodySmall,
                 fontStyle = FontStyle.Italic,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ToolCallBlock(block: ContentBlock.ToolCall) {
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 60.dp, end = 24.dp, top = 2.dp, bottom = 2.dp)
+            .combinedClickable(
+                onClick = {},
+                onLongClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("tool", block.toolName))
+                    Toast.makeText(context, "Copied tool name", Toast.LENGTH_SHORT).show()
+                }
+            ),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, AmberPrimary.copy(alpha = 0.15f))
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.Terminal,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp),
+                tint = AmberPrimary
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = "Tool: ${block.toolName}",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Black,
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
     }
