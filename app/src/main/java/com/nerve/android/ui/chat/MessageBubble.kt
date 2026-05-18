@@ -67,9 +67,7 @@ fun MarkdownText(content: String, modifier: Modifier = Modifier) {
             TextView(context).apply {
                 setTextColor(textColor)
                 tag = markwon
-                isClickable = false
-                isLongClickable = false
-                movementMethod = null
+                setTextIsSelectable(true)
             }
         },
         update = { textView ->
@@ -159,7 +157,6 @@ fun MessageBubble(
                 }
             }
 
-            // Message Surface (Bubble-less style)
             Surface(
                 shape = RoundedCornerShape(24.dp).let {
                     if (isUser) it.copy(topEnd = CornerSize(0.dp)) else it.copy(topStart = CornerSize(0.dp))
@@ -171,9 +168,7 @@ fun MessageBubble(
                     .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
             ) {
                 Box(
-                    modifier = Modifier
-                        .combinedClickable(onClick = {}, onLongClick = copyMessage)
-                        .padding(horizontal = 20.dp, vertical = 14.dp)
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp)
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         val action = message.action
@@ -181,9 +176,7 @@ fun MessageBubble(
                             LocalContentColor provides if (isUser) AmberPrimary else MaterialTheme.colorScheme.onSurface
                         ) {
                             if (action == null) {
-                                SelectionContainer {
-                                    MarkdownText(visibleContent)
-                                }
+                                MarkdownText(visibleContent)
                             } else {
                                 Text(visibleContent, fontWeight = FontWeight.Bold)
                             }
