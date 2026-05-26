@@ -19,7 +19,7 @@ class NodeGroupingTest {
 
         val grouped = groupNodesByServer(items, servers)
 
-        assertEquals(listOf("home", "mac"), grouped.map { it.first.id })
+        assertEquals(listOf("Home Server", "Mac"), grouped.map { it.title })
     }
 
     @Test
@@ -32,7 +32,7 @@ class NodeGroupingTest {
 
         val grouped = groupNodesByServer(items, servers)
 
-        assertEquals(listOf("alpha", "zeta"), grouped.single().second.map { it.nodeName })
+        assertEquals(listOf("alpha", "zeta"), grouped.single().nodes.map { it.nodeName })
     }
 
     @Test
@@ -47,7 +47,7 @@ class NodeGroupingTest {
 
         val grouped = groupNodesByServer(items, servers)
 
-        assertEquals(listOf("s1"), grouped.map { it.first.id })
+        assertEquals(listOf("S1"), grouped.map { it.title })
     }
 
     @Test
@@ -60,9 +60,8 @@ class NodeGroupingTest {
 
         val grouped = groupNodesByServer(items, servers)
 
-        assertEquals(listOf("s1", "ghost"), grouped.map { it.first.id })
-        assertEquals("Ghost", grouped.last().first.name)
-        assertEquals(listOf("n2"), grouped.last().second.map { it.nodeId })
+        assertEquals(listOf("S1", "Ghost"), grouped.map { it.title })
+        assertEquals(listOf("n2"), grouped.last().nodes.map { it.nodeId })
     }
 
     @Test
@@ -74,7 +73,7 @@ class NodeGroupingTest {
 
         val grouped = groupNodesByServer(items, emptyList())
 
-        assertEquals(setOf("home", "mac"), grouped.map { it.first.id }.toSet())
+        assertEquals(setOf("Home Server", "Mac"), grouped.map { it.title }.toSet())
         assertEquals(2, grouped.size)
     }
 }

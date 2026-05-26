@@ -18,6 +18,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.nerve.android.NerveApp
 import com.nerve.android.lifelog.ui.LifeLogScreen
 import com.nerve.android.lifelog.ui.LifeLogViewModel
+import com.nerve.android.morning.ui.MorningBriefScreen
+import com.nerve.android.morning.ui.MorningBriefViewModel
 import com.nerve.android.ui.channels.ChannelChatRoute
 import com.nerve.android.ui.channels.ChannelsRoute
 import com.nerve.android.ui.chat.ChatRoute
@@ -37,6 +39,7 @@ fun AppRoute(app: NerveApp) {
     val channelsViewModel = remember(app) { app.createChannelsViewModel() }
     val updateViewModel = remember(app) { app.createUpdateViewModel() }
     val lifeLogViewModel = remember(app) { LifeLogViewModel(app) }
+    val morningBriefViewModel = remember(app) { MorningBriefViewModel(app) }
     
     val serverState by serverViewModel.uiState.collectAsState()
     val channelsState by channelsViewModel.uiState.collectAsState()
@@ -75,6 +78,13 @@ fun AppRoute(app: NerveApp) {
         nav.guardChat(servers, nodes)
     }
 
+    LaunchedEffect(app.shouldOpenMorningBrief) {
+        if (app.shouldOpenMorningBrief) {
+            nav.selectTab(3)
+            app.shouldOpenMorningBrief = false
+        }
+    }
+
     NerveTheme(darkTheme = false) {
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -107,6 +117,7 @@ fun AppRoute(app: NerveApp) {
                                                 onOpenChannel = { s, c, name -> nav.openChannelChat(s, c, name) },
                                             )
                                             2 -> LifeLogScreen(vm = lifeLogViewModel)
+                                            3 -> MorningBriefScreen(vm = morningBriefViewModel)
                                         }
                                     }
                                 }

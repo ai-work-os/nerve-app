@@ -1,6 +1,9 @@
 package com.nerve.android
 
 import android.app.Application
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import com.nerve.android.domain.channel.InMemoryChannelStore
 import com.nerve.android.domain.channel.RealChannelEventProcessor
 import com.nerve.android.domain.dm.DmEventMapper
@@ -13,6 +16,7 @@ import com.nerve.android.presentation.channels.ChannelsViewModel
 import com.nerve.android.presentation.chat.ChatViewModel
 import com.nerve.android.presentation.nodes.NodesViewModel
 import com.nerve.android.presentation.server.ServerViewModel
+import com.nerve.android.morning.MorningBriefScheduler
 import com.nerve.android.transport.ClientRegistration
 import com.nerve.android.transport.RealNerveClient
 import com.nerve.android.update.HttpVersionFetcher
@@ -66,6 +70,7 @@ class NerveApp : Application() {
     private var resolvedEntry: ResolvedDmEntry? = null
     @Volatile
     private var availableEntryKeys: List<String> = emptyList()
+    var shouldOpenMorningBrief: Boolean by mutableStateOf(false)
 
     private var networkObserver: NetworkObserver? = null
 
@@ -91,6 +96,7 @@ class NerveApp : Application() {
         networkObserver = NetworkObserver(this) {
             serverRegistry.triggerReconnectAll()
         }.also { it.register() }
+        MorningBriefScheduler.schedule(this)
     }
 
     fun createChatViewModel(): ChatViewModel =

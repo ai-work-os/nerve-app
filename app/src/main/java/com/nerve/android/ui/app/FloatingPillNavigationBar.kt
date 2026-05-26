@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Forum
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.*
@@ -33,7 +34,7 @@ fun FloatingPillNavigationBar(
         modifier = modifier
             .padding(bottom = 32.dp)
             .height(80.dp)
-            .width(300.dp),
+            .width(360.dp),
         shape = RoundedCornerShape(40.dp),
         color = Color.White.copy(alpha = 0.95f),
         shadowElevation = 16.dp,
@@ -61,6 +62,12 @@ fun FloatingPillNavigationBar(
                 onClick = { onTabSelected(2) },
                 icon = Icons.Default.Mic,
                 label = "Sense"
+            )
+            PillNavItem(
+                selected = selectedTab == 3,
+                onClick = { onTabSelected(3) },
+                icon = Icons.Default.LightMode,
+                label = "Brief"
             )
         }
     }

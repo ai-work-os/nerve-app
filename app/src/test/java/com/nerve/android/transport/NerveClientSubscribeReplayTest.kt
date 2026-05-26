@@ -28,6 +28,11 @@ class NerveClientSubscribeReplayTest {
 
             val replay = async { client.events.first() }
             advanceUntilIdle()
+            repeat(20) {
+                if (server.receivedMethods().count { method -> method == "node.subscribe" } >= 2) return@repeat
+                advanceUntilIdle()
+                Thread.sleep(10)
+            }
             server.sendNotification(
                 method = "node.update",
                 params = """
