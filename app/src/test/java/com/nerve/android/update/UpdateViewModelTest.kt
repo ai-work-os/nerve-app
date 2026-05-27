@@ -7,6 +7,8 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import java.io.File
+import java.nio.file.Files
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -17,15 +19,18 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class UpdateViewModelTest {
     private val dispatcher = StandardTestDispatcher()
+    private lateinit var cacheDir: File
 
     @BeforeTest
     fun setup() {
         Dispatchers.setMain(dispatcher)
+        cacheDir = Files.createTempDirectory("nerve-update-test-").toFile()
     }
 
     @AfterTest
     fun teardown() {
         Dispatchers.resetMain()
+        cacheDir.deleteRecursively()
     }
 
     private fun vmWithRemote(
@@ -38,7 +43,7 @@ class UpdateViewModelTest {
             checker = UpdateChecker(currentVersionCode = current) { payload },
             dispatcher = dispatcher,
             downloader = downloader,
-            cacheDirProvider = { java.io.File(System.getProperty("java.io.tmpdir") ?: ".") },
+            cacheDirProvider = { cacheDir },
         )
     }
 
@@ -56,7 +61,7 @@ class UpdateViewModelTest {
             },
             dispatcher = dispatcher,
             downloader = downloader,
-            cacheDirProvider = { java.io.File(System.getProperty("java.io.tmpdir") ?: ".") },
+            cacheDirProvider = { cacheDir },
         )
     }
 
