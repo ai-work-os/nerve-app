@@ -1,5 +1,10 @@
 package com.nerve.android.ui.chat
 
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
+import android.view.View
+import android.view.ViewGroup
+import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -160,6 +165,45 @@ class ChatScreenTest {
         composeRule.waitForIdle()
 
         check(autoScrollCalls == 2)
+    }
+
+    @Test
+    fun assistantMarkdown_usesTransparentTextViewWithoutExtraFontPadding() {
+        composeRule.setContent {
+            MessageBubble(
+                message = DmMessage(
+                    id = "markdown",
+                    role = DmRole.ASSISTANT,
+                    content = """
+                        companion-agent just now
+
+                        说明 `inline code` 和中文 English mixed content should wrap naturally.
+
+                        ```kotlin
+                        fun main() {
+                            println("black code block")
+                        }
+                        ```
+                    """.trimIndent(),
+                    timestamp = 100L,
+                    nodeId = "n1",
+                    nodeName = "companion-agent",
+                ),
+                testTag = "assistant-markdown-bubble",
+            )
+        }
+        composeRule.onNodeWithTag("assistant-markdown-bubble").assertIsDisplayed()
+        composeRule.waitForIdle()
+
+        val markdownTextView = composeRule.runOnUiThread {
+            composeRule.activity.window.decorView
+                .findTextViews()
+                .single { it.text.contains("black code block") }
+        }
+
+        check(!markdownTextView.includeFontPadding)
+        val background = markdownTextView.background as? ColorDrawable
+        check(background?.color == Color.TRANSPARENT)
     }
 
     @Test
@@ -338,6 +382,12 @@ class ChatScreenTest {
         composeRule.waitForIdle()
         composeRule.onAllNodesWithText("partial-2").assertCountEquals(0)
     }
+}
+
+private fun View.findTextViews(): List<TextView> {
+    val self = if (this is TextView) listOf(this) else emptyList()
+    if (this !is ViewGroup) return self
+    return self + (0 until childCount).flatMap { getChildAt(it).findTextViews() }
 }
 
 @RunWith(AndroidJUnit4::class)

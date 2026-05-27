@@ -1,7 +1,7 @@
 package com.nerve.android.ui.chat
 
+import android.graphics.Color
 import android.graphics.Typeface
-import android.text.style.ForegroundColorSpan
 import android.widget.TextView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -16,6 +16,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -48,11 +49,15 @@ fun MarkdownText(content: String, modifier: Modifier = Modifier) {
                 .build()
             TextView(context).apply {
                 setTextColor(textColor)
+                setBackgroundColor(Color.TRANSPARENT)
+                includeFontPadding = false
                 tag = markwon
             }
         },
         update = { textView ->
             textView.setTextColor(textColor)
+            textView.setBackgroundColor(Color.TRANSPARENT)
+            textView.includeFontPadding = false
             val markwon = textView.tag as Markwon
             markwon.setMarkdown(textView, content)
         },
@@ -71,6 +76,7 @@ fun MessageBubble(message: DmMessage, testTag: String? = null) {
         DmRole.ASSISTANT -> MaterialTheme.colorScheme.surfaceVariant
         DmRole.SYSTEM -> MaterialTheme.colorScheme.tertiaryContainer
     }
+    val bubbleShape = RoundedCornerShape(16.dp)
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = arrangement,
@@ -88,7 +94,8 @@ fun MessageBubble(message: DmMessage, testTag: String? = null) {
                 modifier = Modifier
                     .padding(vertical = 4.dp)
                     .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
-                    .background(background, RoundedCornerShape(16.dp))
+                    .clip(bubbleShape)
+                    .background(background, bubbleShape)
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
                 MarkdownText(message.content)
