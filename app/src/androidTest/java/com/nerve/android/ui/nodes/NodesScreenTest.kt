@@ -38,6 +38,7 @@ class NodesScreenTest {
                 ),
                 onRefresh = {},
                 onOpenChat = { serverId, nodeId, nodeName -> openChat = Triple(serverId, nodeId, nodeName) },
+                onOpenServers = {},
                 onStop = { serverId, nodeId -> stopNode = serverId to nodeId },
                 onSpawn = { serverId, adapter, name, cwd -> spawnNode = arrayOf(serverId, adapter, name, cwd) },
             )
@@ -73,6 +74,7 @@ class NodesScreenTest {
                 state = NodesUiState(isRefreshing = true),
                 onRefresh = {},
                 onOpenChat = { _, _, _ -> },
+                onOpenServers = {},
                 onStop = { _, _ -> },
                 onSpawn = { _, _, _, _ -> },
                 initialShowSpawnDialog = showSpawn,

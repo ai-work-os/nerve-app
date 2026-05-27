@@ -34,6 +34,9 @@ class ServersScreenTest {
                 onAddServer = { _, _, _ -> },
                 onRemoveServer = {},
                 onReorder = {},
+                onBack = {},
+                onCheckUpdate = {},
+                versionName = "test",
             )
         }
 
