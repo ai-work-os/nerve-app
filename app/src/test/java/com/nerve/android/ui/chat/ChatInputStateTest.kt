@@ -73,6 +73,20 @@ class ChatInputStateTest {
                 hasAttachment = true,
                 canSend = true,
                 isSending = true,
+                isStreaming = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `isStreaming true disables regardless`() {
+        assertFalse(
+            ChatInputState.isSendEnabled(
+                text = "hi",
+                hasAttachment = true,
+                canSend = true,
+                isSending = false,
+                isStreaming = true,
             ),
         )
     }

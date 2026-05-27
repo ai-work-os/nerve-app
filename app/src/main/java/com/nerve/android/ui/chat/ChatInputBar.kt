@@ -26,6 +26,7 @@ import com.nerve.android.ui.theme.CreamBackground
 fun ChatInputBar(
     canSend: Boolean,
     isSending: Boolean,
+    isStreaming: Boolean = false,
     onSend: (String, List<PendingAttachment>) -> Unit,
     onPickImage: () -> Unit,
     pendingAttachments: List<PendingAttachment> = emptyList(),
@@ -37,6 +38,7 @@ fun ChatInputBar(
         hasAttachment = pendingAttachments.isNotEmpty(),
         canSend = canSend,
         isSending = isSending,
+        isStreaming = isStreaming,
     )
     val emitSend: () -> Unit = {
         if (enabled) {
@@ -116,7 +118,10 @@ fun ChatInputBar(
                         focusedIndicatorColor = Color.Transparent,
                         unfocusedIndicatorColor = Color.Transparent,
                     ),
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Default),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Send),
+                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                        onSend = { emitSend() },
+                    ),
                 )
 
                 Button(
