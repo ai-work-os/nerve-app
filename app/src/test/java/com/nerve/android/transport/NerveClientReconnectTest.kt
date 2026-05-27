@@ -19,14 +19,18 @@ class NerveClientReconnectTest {
                 ServerConfig("s1", "home", server.address()),
                 ClientRegistration(name = "android-ui", capabilities = listOf("ui"), permissions = "operator"),
             )
-            assertEquals("node.register", server.takeClientMessageAsJson().method)
+            val firstRegister = server.takeClientMessageAsJson()
+            assertEquals("node.register", firstRegister.method)
+            assertEquals(true, firstRegister.params["persistent"])
 
             server.closeConnection()
             assertEquals(ConnectionState.RECONNECTING, client.connectionState.value)
 
             server.enqueueRegisterSuccess()
             advanceUntilIdle()
-            assertEquals("node.register", server.takeClientMessageAsJson().method)
+            val secondRegister = server.takeClientMessageAsJson()
+            assertEquals("node.register", secondRegister.method)
+            assertEquals(true, secondRegister.params["persistent"])
             repeat(20) {
                 if (client.connectionState.value == ConnectionState.CONNECTED) return@repeat
                 advanceUntilIdle()

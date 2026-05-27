@@ -13,8 +13,8 @@ android {
         applicationId = "com.nerve.app"
         minSdk = 29
         targetSdk = 35
-        versionCode = 31
-        versionName = "0.8.7"
+        versionCode = 32
+        versionName = "0.8.8"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

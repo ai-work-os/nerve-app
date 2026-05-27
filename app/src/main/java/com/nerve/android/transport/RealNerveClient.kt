@@ -214,6 +214,7 @@ class RealNerveClient(
                     },
                 )
                 put("permissions", registration.permissions)
+                put("persistent", registration.persistent)
             },
         )
         Logger.debug("NerveClient", "register_success", mapOf("name" to registration.name))

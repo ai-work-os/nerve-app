@@ -7,4 +7,5 @@ data class ClientRegistration(
     val name: String,
     val capabilities: List<String> = listOf("ui"),
     val permissions: String = "operator",
+    val persistent: Boolean = true,
 )
