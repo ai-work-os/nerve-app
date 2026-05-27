@@ -23,8 +23,19 @@ interface NerveClient {
     suspend fun listChannels(): List<ChannelInfo>
     suspend fun subscribe(nodeId: String)
     suspend fun unsubscribe(nodeId: String)
-    suspend fun prompt(nodeId: String, content: String): PromptResult
+    suspend fun prompt(
+        nodeId: String,
+        content: String,
+        attachments: List<PromptAttachment> = emptyList(),
+    ): PromptResult
     suspend fun spawnNode(adapter: String, name: String?, cwd: String?): SpawnResult
     suspend fun cancelNode(nodeId: String)
     suspend fun stopNode(nodeId: String)
+}
+
+sealed interface PromptAttachment {
+    data class Image(
+        val mimeType: String,
+        val data: String,
+    ) : PromptAttachment
 }

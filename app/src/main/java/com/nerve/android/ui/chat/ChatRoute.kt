@@ -1,5 +1,10 @@
 package com.nerve.android.ui.chat
 
+import android.net.Uri
+import android.util.Base64
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -9,10 +14,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import com.nerve.android.domain.dm.ContentBlock
 import com.nerve.android.domain.server.ServerRegistry
 import com.nerve.android.presentation.chat.ChatViewModel
 import com.nerve.android.transport.NerveEvent
+import com.nerve.android.transport.PromptAttachment
 import com.nerve.android.util.Logger
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
@@ -30,9 +37,23 @@ fun ChatRoute(
     onEnter: ((String, String) -> Unit)? = null,
 ) {
     val state by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var streamingText by remember(serverId, nodeId) { mutableStateOf("") }
     var streamingBlocks by remember(serverId, nodeId) { mutableStateOf<List<ContentBlock>>(emptyList()) }
+    var selectedImages by remember(serverId, nodeId) { mutableStateOf<List<PromptAttachment>>(emptyList()) }
+    val imagePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia(maxItems = 10),
+    ) { uris ->
+        val attachments = uris.mapNotNull { uri ->
+            runCatching { uri.toPromptAttachment(context.contentResolver) }
+                .onFailure { Logger.w("ChatRoute", "image attach failed: ${it.message}") }
+                .getOrNull()
+        }
+        if (attachments.isNotEmpty()) {
+            selectedImages = selectedImages + attachments
+        }
+    }
 
     LaunchedEffect(serverId, nodeId, nodeName) {
         Logger.d("ChatRoute", "chat route enter key=$serverId:$nodeId")
@@ -44,6 +65,7 @@ fun ChatRoute(
         onDispose {
             streamingText = ""
             streamingBlocks = emptyList()
+            selectedImages = emptyList()
             Logger.d("ChatRoute", "chat route leave key=$serverId:$nodeId")
             viewModel.leaveDm()
         }
@@ -151,9 +173,21 @@ fun ChatRoute(
         state = state,
         streamingText = streamingText,
         streamingBlocks = streamingBlocks,
-        onSend = { text ->
-            Logger.d("ChatRoute", "chat ui send key=$serverId:$nodeId len=${text.length}")
-            scope.launch { viewModel.sendMessage(text) }
+        canSend = !state.isStreaming,
+        selectedImages = selectedImages,
+        canPickImages = true,
+        onPickImages = {
+            imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        },
+        onRemoveImage = { index ->
+            selectedImages = selectedImages.filterIndexed { i, _ -> i != index }
+        },
+        onClearImages = {
+            selectedImages = emptyList()
+        },
+        onSend = { text, attachments ->
+            Logger.d("ChatRoute", "chat ui send key=$serverId:$nodeId len=${text.length} attachments=${attachments.size}")
+            scope.launch { viewModel.sendMessage(text, attachments) }
         },
         onCancel = {
             Logger.d("ChatRoute", "chat ui cancel key=$serverId:$nodeId")
@@ -164,5 +198,15 @@ fun ChatRoute(
             scope.launch { serverRegistry.client(serverId)?.stopNode(nodeId) }
         },
         onBack = onBack,
+    )
+}
+
+private fun Uri.toPromptAttachment(contentResolver: android.content.ContentResolver): PromptAttachment.Image {
+    val mimeType = contentResolver.getType(this) ?: "image/jpeg"
+    val bytes = contentResolver.openInputStream(this)?.use { it.readBytes() }
+        ?: error("unable to read image")
+    return PromptAttachment.Image(
+        mimeType = mimeType,
+        data = Base64.encodeToString(bytes, Base64.NO_WRAP),
     )
 }

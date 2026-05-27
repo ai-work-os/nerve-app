@@ -4,9 +4,10 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -34,6 +35,7 @@ import com.nerve.android.transport.ClientRegistration
 import com.nerve.android.transport.ConnectionState
 import com.nerve.android.transport.NerveClient
 import com.nerve.android.transport.NerveEvent
+import com.nerve.android.transport.PromptAttachment
 import com.nerve.android.transport.ServerConfig
 import com.nerve.android.transport.model.ChannelInfo
 import com.nerve.android.transport.model.NodeInfo
@@ -77,7 +79,7 @@ class ChatScreenTest {
                     errorMessage = "boom",
                 ),
                 streamingText = "partial reply",
-                onSend = { sentText = it },
+                onSend = { text, _ -> sentText = text },
                 onCancel = { cancelCalls += 1 },
             )
         }
@@ -110,13 +112,76 @@ class ChatScreenTest {
                     isSending = true,
                 ),
                 streamingText = "",
-                onSend = {},
+                onSend = { _, _ -> },
                 onCancel = {},
             )
         }
 
         composeRule.onNodeWithText("Send").assertIsNotEnabled()
         composeRule.onNodeWithText("Sending").assertIsDisplayed()
+    }
+
+    @Test
+    fun chatScreen_streaming_allows_images_but_blocks_submit_until_stream_ends() {
+        var state by mutableStateOf(
+            ChatUiState(
+                serverId = "s1",
+                nodeId = "n1",
+                nodeName = "bot",
+                isStreaming = true,
+            ),
+        )
+        var pickCalls = 0
+        var sent: Pair<String, List<PromptAttachment>>? = null
+        var selectedImages by mutableStateOf(
+            listOf(
+                PromptAttachment.Image(mimeType = "image/png", data = "one"),
+                PromptAttachment.Image(mimeType = "image/jpeg", data = "two"),
+            ),
+        )
+
+        composeRule.setContent {
+            ChatScreen(
+                state = state,
+                streamingText = "partial",
+                canSend = !state.isStreaming,
+                selectedImages = selectedImages,
+                canPickImages = true,
+                onPickImages = { pickCalls += 1 },
+                onRemoveImage = { index ->
+                    selectedImages = selectedImages.toMutableList().also { it.removeAt(index) }
+                },
+                onClearImages = { selectedImages = emptyList() },
+                onSend = { text, attachments -> sent = text to attachments },
+                onCancel = {},
+            )
+        }
+
+        composeRule.onNodeWithText("Message").performTextInput("draft")
+        composeRule.onNodeWithText("Add image").assertIsEnabled().performClick()
+        composeRule.onNodeWithText("Image 1").assertIsDisplayed()
+        composeRule.onNodeWithText("Image 2").assertIsDisplayed()
+        composeRule.onNodeWithText("Send").assertIsNotEnabled()
+        composeRule.onNodeWithText("Message").performImeAction()
+        check(pickCalls == 1)
+        check(sent == null)
+
+        state = state.copy(isStreaming = false)
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText("draft").assertIsDisplayed()
+        composeRule.onNodeWithText("Image 1").assertIsDisplayed()
+        composeRule.onNodeWithText("Image 2").assertIsDisplayed()
+        composeRule.onNodeWithText("Send").assertIsEnabled().performClick()
+        check(sent?.first == "draft")
+        check(
+            sent?.second == listOf(
+                PromptAttachment.Image(mimeType = "image/png", data = "one"),
+                PromptAttachment.Image(mimeType = "image/jpeg", data = "two"),
+            ),
+        )
+        composeRule.onNodeWithText("Message").assertTextEquals("")
+        check(selectedImages.isEmpty())
     }
 
     @Test
@@ -130,7 +195,7 @@ class ChatScreenTest {
                     isStreaming = true,
                 ),
                 streamingText = "",
-                onSend = {},
+                onSend = { _, _ -> },
                 onCancel = {},
             )
         }
@@ -199,7 +264,7 @@ class ChatScreenTest {
         composeRule.onNodeWithText("Message").performTextInput("hello route")
         composeRule.onNodeWithText("Message").performImeAction()
         composeRule.waitForIdle()
-        check(client.promptCalls == listOf("n1" to "hello route"))
+        check(client.promptCalls == listOf(RecordingNerveClient.PromptCall("n1", "hello route")))
 
         check(
             registry.eventsFlow.tryEmit(
@@ -456,12 +521,18 @@ private class RecordingServerRegistry : ServerRegistry {
 }
 
 private class RecordingNerveClient : NerveClient {
+    data class PromptCall(
+        val nodeId: String,
+        val content: String,
+        val attachments: List<PromptAttachment> = emptyList(),
+    )
+
     override val connectionState: StateFlow<ConnectionState> = MutableStateFlow(ConnectionState.CONNECTED)
     override val events: SharedFlow<NerveEvent> = MutableSharedFlow(extraBufferCapacity = 32)
 
     val subscribeCalls = mutableListOf<String>()
     val unsubscribeCalls = mutableListOf<String>()
-    val promptCalls = mutableListOf<Pair<String, String>>()
+    val promptCalls = mutableListOf<PromptCall>()
     val stopCalls = mutableListOf<String>()
 
     override suspend fun connect(server: ServerConfig, registration: ClientRegistration) = Unit
@@ -478,8 +549,12 @@ private class RecordingNerveClient : NerveClient {
         unsubscribeCalls += nodeId
     }
 
-    override suspend fun prompt(nodeId: String, content: String): PromptResult {
-        promptCalls += nodeId to content
+    override suspend fun prompt(
+        nodeId: String,
+        content: String,
+        attachments: List<PromptAttachment>,
+    ): PromptResult {
+        promptCalls += PromptCall(nodeId, content, attachments)
         return PromptResult(stopReason = "stop")
     }
 

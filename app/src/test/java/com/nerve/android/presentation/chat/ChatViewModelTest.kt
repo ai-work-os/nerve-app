@@ -10,6 +10,7 @@ import com.nerve.android.domain.server.ServerScopedEvent
 import com.nerve.android.presentation.FakeDmEventProcessor
 import com.nerve.android.presentation.FakeServerRegistry
 import com.nerve.android.transport.NerveEvent
+import com.nerve.android.transport.PromptAttachment
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -74,7 +75,7 @@ class ChatViewModelTest {
         assertFalse(vm.uiState.value.isStreaming)
 
         vm.sendMessage("ping")
-        assertEquals(listOf("n1" to "ping"), client.promptCalls)
+        assertEquals(listOf(FakeNerveClient.PromptCall("n1", "ping")), client.promptCalls)
     }
 
     @Test
@@ -235,6 +236,53 @@ class ChatViewModelTest {
         assertEquals(1, userMessages.size,
             "Expected exactly 1 user message after sendMessage, got ${userMessages.size}: $userMessages")
         assertEquals("ping", userMessages.first().content)
+    }
+
+    @Test
+    fun `sendMessage forwards multiple image attachments`() = runTest {
+        val store = InMemoryDmStore()
+        val processor = FakeDmEventProcessor()
+        val registry = FakeServerRegistry()
+        val client = FakeNerveClient()
+        registry.clients["s1"] = client
+        val vm = ChatViewModel(store, processor, registry, Dispatchers.Unconfined)
+        val attachments = listOf(
+            PromptAttachment.Image(mimeType = "image/png", data = "one"),
+            PromptAttachment.Image(mimeType = "image/jpeg", data = "two"),
+        )
+
+        vm.enterDm("s1", "n1", "bot")
+        vm.sendMessage("look", attachments)
+
+        assertEquals(listOf(FakeNerveClient.PromptCall("n1", "look", attachments)), client.promptCalls)
+    }
+
+    @Test
+    fun `sendMessage ignores prompts while streaming`() = runTest {
+        val store = InMemoryDmStore()
+        val processor = FakeDmEventProcessor()
+        val registry = FakeServerRegistry()
+        val client = FakeNerveClient()
+        registry.clients["s1"] = client
+        val vm = ChatViewModel(store, processor, registry, Dispatchers.Unconfined)
+
+        vm.enterDm("s1", "n1", "bot")
+        registry.events.emit(
+            ServerScopedEvent(
+                "s1",
+                NerveEvent.NodeUpdate(
+                    nodeId = "n1",
+                    name = "bot",
+                    detail = buildJsonObject {
+                        put("update", buildJsonObject { put("sessionUpdate", "agent_message_chunk") })
+                    },
+                ),
+            ),
+        )
+        vm.sendMessage("blocked", listOf(PromptAttachment.Image(mimeType = "image/png", data = "one")))
+
+        assertTrue(client.promptCalls.isEmpty())
+        assertTrue(vm.uiState.value.messages.none { it.content == "blocked" })
     }
 
     @Test

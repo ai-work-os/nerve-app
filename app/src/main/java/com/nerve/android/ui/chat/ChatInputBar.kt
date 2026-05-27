@@ -1,11 +1,18 @@
 package com.nerve.android.ui.chat
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -18,50 +25,90 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import com.nerve.android.transport.PromptAttachment
 
 @Composable
 fun ChatInputBar(
     canSend: Boolean,
     isSending: Boolean,
-    onSend: (String) -> Unit,
+    selectedImages: List<PromptAttachment> = emptyList(),
+    canPickImages: Boolean = false,
+    onPickImages: () -> Unit = {},
+    onRemoveImage: (Int) -> Unit = {},
+    onClearImages: () -> Unit = {},
+    onSend: (String, List<PromptAttachment>) -> Unit,
 ) {
     var text by rememberSaveable { mutableStateOf("") }
-    val enabled = canSend && text.isNotBlank() && !isSending
+    val enabled = canSend && (text.isNotBlank() || selectedImages.isNotEmpty()) && !isSending
 
-    Row(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        OutlinedTextField(
-            value = text,
-            onValueChange = { text = it },
-            modifier = Modifier
-                .weight(1f)
-                .padding(vertical = 4.dp),
-            label = { Text("Message") },
-            singleLine = true,
-            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Send),
-            keyboardActions = androidx.compose.foundation.text.KeyboardActions(
-                onSend = {
-                    if (enabled) {
-                        val value = text
-                        text = ""
-                        onSend(value)
-                    }
-                },
-            ),
-        )
-        IconButton(
-            onClick = {
-                if (!enabled) return@IconButton
-                val value = text
-                text = ""
-                onSend(value)
-            },
-            enabled = enabled,
-            modifier = Modifier.padding(vertical = 12.dp),
+        if (canPickImages || selectedImages.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Button(
+                    onClick = onPickImages,
+                    enabled = canPickImages,
+                ) {
+                    Icon(Icons.Filled.AddPhotoAlternate, contentDescription = null)
+                    Text("Add image")
+                }
+                selectedImages.forEachIndexed { index, _ ->
+                    AssistChip(
+                        onClick = { onRemoveImage(index) },
+                        label = { Text("Image ${index + 1}") },
+                        trailingIcon = {
+                            Icon(Icons.Filled.Close, contentDescription = "Remove image ${index + 1}")
+                        },
+                    )
+                }
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(vertical = 4.dp),
+                label = { Text("Message") },
+                singleLine = true,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                    onSend = {
+                        if (enabled) {
+                            val value = text
+                            val images = selectedImages
+                            text = ""
+                            onClearImages()
+                            onSend(value, images)
+                        }
+                    },
+                ),
+            )
+            IconButton(
+                onClick = {
+                    if (!enabled) return@IconButton
+                    val value = text
+                    val images = selectedImages
+                    text = ""
+                    onClearImages()
+                    onSend(value, images)
+                },
+                enabled = enabled,
+                modifier = Modifier.padding(vertical = 12.dp),
+            ) {
+                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
+            }
         }
     }
 }

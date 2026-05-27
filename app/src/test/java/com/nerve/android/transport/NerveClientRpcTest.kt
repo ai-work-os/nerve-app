@@ -112,12 +112,50 @@ class NerveClientRpcTest {
         try {
             server.enqueueRegisterSuccess()
             client.connect(ServerConfig("s1", "home", server.address()), ClientRegistration(name = "android-ui"))
+            server.takeClientMessageAsJson()
             server.enqueueRpcResult("node.prompt") {
                 """{"stopReason":"end_turn"}"""
             }
 
             val result = client.prompt("n1", "hello")
 
+            assertEquals("end_turn", result.stopReason)
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @Test
+    fun `prompt sends image attachments`() = runTest {
+        val server = FakeNerveWsServer()
+        val client = RealNerveClient(server.url, backoffStrategy = FakeBackoffStrategy())
+        try {
+            server.enqueueRegisterSuccess()
+            client.connect(ServerConfig("s1", "home", server.address()), ClientRegistration(name = "android-ui"))
+            server.enqueueRpcResult("node.prompt") {
+                """{"stopReason":"end_turn"}"""
+            }
+
+            val result = client.prompt(
+                nodeId = "n1",
+                content = "look",
+                attachments = listOf(
+                    PromptAttachment.Image(mimeType = "image/png", data = "abc"),
+                    PromptAttachment.Image(mimeType = "image/jpeg", data = "def"),
+                ),
+            )
+
+            val promptMessage = server.takeClientMessageAsJson()
+            assertEquals("node.prompt", promptMessage.method)
+            assertEquals("n1", promptMessage.params["nodeId"])
+            assertEquals("look", promptMessage.params["content"])
+            assertEquals(
+                listOf(
+                    mapOf("type" to "image", "mimeType" to "image/png", "data" to "abc"),
+                    mapOf("type" to "image", "mimeType" to "image/jpeg", "data" to "def"),
+                ),
+                promptMessage.params["attachments"],
+            )
             assertEquals("end_turn", result.stopReason)
         } finally {
             client.disconnect()

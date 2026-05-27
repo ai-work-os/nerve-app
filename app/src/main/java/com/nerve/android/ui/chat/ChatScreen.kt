@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.nerve.android.domain.dm.ContentBlock
 import com.nerve.android.presentation.chat.ChatUiState
+import com.nerve.android.transport.PromptAttachment
 import com.nerve.android.util.Logger
 
 @Composable
@@ -25,7 +26,12 @@ fun ChatScreen(
     streamingText: String,
     streamingBlocks: List<ContentBlock> = emptyList(),
     canSend: Boolean = true,
-    onSend: (String) -> Unit,
+    selectedImages: List<PromptAttachment> = emptyList(),
+    canPickImages: Boolean = false,
+    onPickImages: () -> Unit = {},
+    onRemoveImage: (Int) -> Unit = {},
+    onClearImages: () -> Unit = {},
+    onSend: (String, List<PromptAttachment>) -> Unit,
     onCancel: () -> Unit,
     onStop: (() -> Unit)? = null,
     onBack: (() -> Unit)? = null,
@@ -69,6 +75,11 @@ fun ChatScreen(
             ChatInputBar(
                 canSend = canSend,
                 isSending = state.isSending,
+                selectedImages = selectedImages,
+                canPickImages = canPickImages,
+                onPickImages = onPickImages,
+                onRemoveImage = onRemoveImage,
+                onClearImages = onClearImages,
                 onSend = onSend,
             )
         }

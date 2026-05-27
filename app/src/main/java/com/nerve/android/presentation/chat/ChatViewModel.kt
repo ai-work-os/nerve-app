@@ -8,6 +8,7 @@ import com.nerve.android.domain.dm.DmRole
 import com.nerve.android.domain.dm.DmStore
 import com.nerve.android.domain.server.ServerRegistry
 import com.nerve.android.transport.NerveEvent
+import com.nerve.android.transport.PromptAttachment
 import com.nerve.android.util.Logger
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -137,25 +138,27 @@ class ChatViewModel(
         )
     }
 
-    suspend fun sendMessage(text: String) {
-        if (text.isBlank()) return
+    suspend fun sendMessage(text: String, attachments: List<PromptAttachment> = emptyList()) {
+        if (text.isBlank() && attachments.isEmpty()) return
+        if (_uiState.value.isStreaming || _uiState.value.isSending) return
         val serverId = currentServerId ?: return
         val nodeId = currentNodeId ?: return
         val dmKey = DmKey("$serverId:$nodeId")
         val nodeName = _uiState.value.nodeName ?: nodeId
-        Logger.d("ChatViewModel", "chat send key=${dmKey.value} len=${text.length}")
+        val content = text.ifBlank { "Attached image${if (attachments.size == 1) "" else "s"}" }
+        Logger.d("ChatViewModel", "chat send key=${dmKey.value} len=${content.length} attachments=${attachments.size}")
         _uiState.value = _uiState.value.copy(isSending = true, errorMessage = null)
         val userMessage = DmMessage(
             id = "local-${System.currentTimeMillis()}",
             role = DmRole.USER,
-            content = text,
+            content = content,
             timestamp = System.currentTimeMillis(),
             nodeId = nodeId,
             nodeName = nodeName,
         )
         dmStore.appendMessage(dmKey, userMessage)
         runCatching {
-            serverRegistry.client(serverId)?.prompt(nodeId, text)
+            serverRegistry.client(serverId)?.prompt(nodeId, content, attachments)
         }.onFailure {
             _uiState.value = _uiState.value.copy(errorMessage = it.message)
         }

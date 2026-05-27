@@ -4,6 +4,7 @@ import com.nerve.android.transport.ClientRegistration
 import com.nerve.android.transport.ConnectionState
 import com.nerve.android.transport.NerveClient
 import com.nerve.android.transport.NerveEvent
+import com.nerve.android.transport.PromptAttachment
 import com.nerve.android.transport.ServerConfig
 import com.nerve.android.transport.model.ChannelInfo
 import com.nerve.android.transport.model.NodeInfo
@@ -87,7 +88,11 @@ private class BlockingNerveClient(
     override suspend fun listChannels(): List<ChannelInfo> = emptyList()
     override suspend fun subscribe(nodeId: String) {}
     override suspend fun unsubscribe(nodeId: String) {}
-    override suspend fun prompt(nodeId: String, content: String) = PromptResult(stopReason = null)
+    override suspend fun prompt(
+        nodeId: String,
+        content: String,
+        attachments: List<PromptAttachment>,
+    ) = PromptResult(stopReason = null)
     override suspend fun spawnNode(adapter: String, name: String?, cwd: String?) = SpawnResult(nodeId = null)
     override suspend fun cancelNode(nodeId: String) {}
     override suspend fun stopNode(nodeId: String) {}

@@ -5,6 +5,7 @@ import com.nerve.android.transport.ClientRegistration
 import com.nerve.android.transport.ConnectionState
 import com.nerve.android.transport.NerveClient
 import com.nerve.android.transport.NerveEvent
+import com.nerve.android.transport.PromptAttachment
 import com.nerve.android.transport.ServerConfig
 import com.nerve.android.transport.model.ChannelInfo
 import com.nerve.android.transport.model.NodeInfo
@@ -19,6 +20,12 @@ import kotlinx.serialization.json.buildJsonObject
 import java.util.concurrent.CopyOnWriteArrayList
 
 class FakeNerveClient : NerveClient {
+    data class PromptCall(
+        val nodeId: String,
+        val content: String,
+        val attachments: List<PromptAttachment> = emptyList(),
+    )
+
     override val connectionState: MutableStateFlow<ConnectionState> =
         MutableStateFlow(ConnectionState.DISCONNECTED)
     override val events: MutableSharedFlow<NerveEvent> = MutableSharedFlow(extraBufferCapacity = 32)
@@ -30,7 +37,7 @@ class FakeNerveClient : NerveClient {
     val disconnectedCalls = CopyOnWriteArrayList<Unit>()
     val subscribeCalls = CopyOnWriteArrayList<String>()
     val unsubscribeCalls = CopyOnWriteArrayList<String>()
-    val promptCalls = CopyOnWriteArrayList<Pair<String, String>>()
+    val promptCalls = CopyOnWriteArrayList<PromptCall>()
     val spawnCalls = CopyOnWriteArrayList<Triple<String, String?, String?>>()
     val cancelCalls = CopyOnWriteArrayList<String>()
     val stopCalls = CopyOnWriteArrayList<String>()
@@ -81,8 +88,12 @@ class FakeNerveClient : NerveClient {
         unsubscribeCalls += nodeId
     }
 
-    override suspend fun prompt(nodeId: String, content: String): PromptResult {
-        promptCalls += nodeId to content
+    override suspend fun prompt(
+        nodeId: String,
+        content: String,
+        attachments: List<PromptAttachment>,
+    ): PromptResult {
+        promptCalls += PromptCall(nodeId, content, attachments)
         return promptResult.getOrThrow()
     }
 
