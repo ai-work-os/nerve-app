@@ -123,33 +123,6 @@ fun AppRoute(app: NerveApp) {
                                 }
                             }
 
-                            // Update Banner - Floating Overlay
-                            AnimatedVisibility(
-                                visible = (updateState as? UpdateState.Available)?.let { it.info.versionCode != dismissedVersion } ?: false,
-                                enter = slideInVertically { -it } + fadeIn(),
-                                exit = slideOutVertically { -it } + fadeOut(),
-                                modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding()
-                            ) {
-                                val available = updateState as? UpdateState.Available
-                                if (available != null) {
-                                    UpdateBanner(
-                                        info = available.info,
-                                        download = downloadState,
-                                        onUpdate = {
-                                            when (val state = downloadState) {
-                                                is DownloadState.Ready -> ApkInstaller.launchInstall(context, state.file)
-                                                else -> updateViewModel.startDownload()
-                                            }
-                                        },
-                                        onDismiss = {
-                                            updateViewModel.resetDownload()
-                                            updateViewModel.dismiss()
-                                        },
-                                        onRetry = { updateViewModel.startDownload() },
-                                    )
-                                }
-                            }
-
                             // Floating Navigation Bar
                             FloatingPillNavigationBar(
                                 selectedTab = nav.selectedTab,
@@ -197,6 +170,33 @@ fun AppRoute(app: NerveApp) {
                             channelId = current.channelId,
                             channelName = current.channelName,
                             onBack = { nav.back() },
+                        )
+                    }
+                }
+
+                // Update Banner - Floating Overlay
+                AnimatedVisibility(
+                    visible = (updateState as? UpdateState.Available)?.let { it.info.versionCode != dismissedVersion } ?: false,
+                    enter = slideInVertically { -it } + fadeIn(),
+                    exit = slideOutVertically { -it } + fadeOut(),
+                    modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding()
+                ) {
+                    val available = updateState as? UpdateState.Available
+                    if (available != null) {
+                        UpdateBanner(
+                            info = available.info,
+                            download = downloadState,
+                            onUpdate = {
+                                when (val state = downloadState) {
+                                    is DownloadState.Ready -> ApkInstaller.launchInstall(context, state.file)
+                                    else -> updateViewModel.startDownload()
+                                }
+                            },
+                            onDismiss = {
+                                updateViewModel.resetDownload()
+                                updateViewModel.dismiss()
+                            },
+                            onRetry = { updateViewModel.startDownload() },
                         )
                     }
                 }
