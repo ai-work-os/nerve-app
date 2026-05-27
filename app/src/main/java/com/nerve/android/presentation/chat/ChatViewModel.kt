@@ -224,6 +224,7 @@ class ChatViewModel(
 
     suspend fun sendMessage(text: String) {
         if (text.isBlank()) return
+        if (_uiState.value.isStreaming || _uiState.value.isSending) return
         val serverId = currentServerId ?: return
         val nodeId = currentNodeId ?: return
         val nodeName = _uiState.value.nodeName ?: nodeId
@@ -296,16 +297,21 @@ class ChatViewModel(
         _uiState.value = _uiState.value.copy(isSending = false)
     }
 
-    suspend fun sendImage(caption: String, mimeType: String, base64Data: String) {
+    suspend fun sendImages(caption: String, attachments: List<PromptAttachment.Image>) {
+        if (attachments.isEmpty()) return
+        if (_uiState.value.isStreaming || _uiState.value.isSending) return
         val serverId = currentServerId ?: return
         val nodeId = currentNodeId ?: return
         val nodeName = _uiState.value.nodeName ?: nodeId
-        val text = caption.ifBlank { "Image" }
-        val localText = "$text\n[image:$mimeType]"
+        val text = caption.ifBlank { "Attached image(s)" }
+        val localText = buildString {
+            append(text)
+            attachments.forEach { append("\n[image:${it.mimeType}]") }
+        }
         Logger.debug(
             "ChatViewModel",
             "dm_image_send_begin",
-            mapOf("serverId" to serverId, "nodeId" to nodeId, "mime" to mimeType, "bytes" to base64Data.length),
+            mapOf("serverId" to serverId, "nodeId" to nodeId, "imageCount" to attachments.size),
         )
         _uiState.value = _uiState.value.copy(isSending = true, errorMessage = null)
         sessionManager.onEvent(
@@ -321,7 +327,7 @@ class ChatViewModel(
             serverRegistry.client(serverId)?.prompt(
                 nodeId,
                 text,
-                PromptAttachment.Image(mimeType = mimeType, data = base64Data),
+                attachments,
             )
         }.onFailure {
             Logger.warn(

@@ -168,7 +168,11 @@ private class TestNerveClient : NerveClient {
 
     override suspend fun unsubscribe(nodeId: String) = Unit
 
-    override suspend fun prompt(nodeId: String, content: String, attachment: com.nerve.android.transport.PromptAttachment?): PromptResult =
+    override suspend fun prompt(
+        nodeId: String,
+        content: String,
+        attachments: List<com.nerve.android.transport.PromptAttachment>,
+    ): PromptResult =
         PromptResult(stopReason = "stop")
 
     override suspend fun spawnNode(adapter: String, name: String?, cwd: String?): SpawnResult =

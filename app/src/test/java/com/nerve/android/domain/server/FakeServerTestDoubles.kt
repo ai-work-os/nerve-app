@@ -88,10 +88,12 @@ class FakeNerveClient : NerveClient {
         unsubscribeResult.getOrThrow()
     }
 
-    override suspend fun prompt(nodeId: String, content: String, attachment: PromptAttachment?): PromptResult {
+    override suspend fun prompt(nodeId: String, content: String, attachments: List<PromptAttachment>): PromptResult {
         promptCalls += nodeId to content
-        if (attachment is PromptAttachment.Image) {
-            imagePromptCalls += "${attachment.mimeType}:${attachment.data}"
+        attachments.forEach { attachment ->
+            if (attachment is PromptAttachment.Image) {
+                imagePromptCalls += "${attachment.mimeType}:${attachment.data}"
+            }
         }
         return promptResult.getOrThrow()
     }

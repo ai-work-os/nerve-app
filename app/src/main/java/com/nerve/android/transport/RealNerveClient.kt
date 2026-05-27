@@ -145,24 +145,26 @@ class RealNerveClient(
         Logger.debug("NerveClient", "unsubscribe_success", mapOf("nodeId" to nodeId))
     }
 
-    override suspend fun prompt(nodeId: String, content: String, attachment: PromptAttachment?): PromptResult {
+    override suspend fun prompt(nodeId: String, content: String, attachments: List<PromptAttachment>): PromptResult {
         val result = call(
             "node.prompt",
             buildJsonObject {
                 put("nodeId", nodeId)
                 put("content", content)
-                if (attachment != null) {
+                if (attachments.isNotEmpty()) {
                     put(
                         "attachments",
                         buildJsonArray {
-                            when (attachment) {
-                                is PromptAttachment.Image -> add(
-                                    buildJsonObject {
-                                        put("type", "image")
-                                        put("mimeType", attachment.mimeType)
-                                        put("data", attachment.data)
-                                    },
-                                )
+                            attachments.forEach { attachment ->
+                                when (attachment) {
+                                    is PromptAttachment.Image -> add(
+                                        buildJsonObject {
+                                            put("type", "image")
+                                            put("mimeType", attachment.mimeType)
+                                            put("data", attachment.data)
+                                        },
+                                    )
+                                }
                             }
                         },
                     )

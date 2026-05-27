@@ -1,7 +1,9 @@
 package com.nerve.android.ui.chat
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -24,23 +26,24 @@ import com.nerve.android.ui.theme.CreamBackground
 fun ChatInputBar(
     canSend: Boolean,
     isSending: Boolean,
-    onSend: (String) -> Unit,
+    onSend: (String, List<PendingAttachment>) -> Unit,
     onPickImage: () -> Unit,
-    pendingAttachment: PendingAttachment? = null,
-    onClearAttachment: () -> Unit = {},
+    pendingAttachments: List<PendingAttachment> = emptyList(),
+    onRemoveAttachment: (Int) -> Unit = {},
 ) {
     var text by rememberSaveable { mutableStateOf("") }
     val enabled = ChatInputState.isSendEnabled(
         text = text,
-        hasAttachment = pendingAttachment != null,
+        hasAttachment = pendingAttachments.isNotEmpty(),
         canSend = canSend,
         isSending = isSending,
     )
     val emitSend: () -> Unit = {
         if (enabled) {
             val value = text
+            val attachments = pendingAttachments
             text = ""
-            onSend(value)
+            onSend(value, attachments)
         }
     }
 
@@ -48,7 +51,7 @@ fun ChatInputBar(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (pendingAttachment != null) {
+        if (pendingAttachments.isNotEmpty()) {
             Surface(
                 color = MaterialTheme.colorScheme.surface,
                 shape = RoundedCornerShape(12.dp),
@@ -56,19 +59,26 @@ fun ChatInputBar(
                 shadowElevation = 2.dp
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    modifier = Modifier
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Image, contentDescription = null, tint = AmberPrimary, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = pendingAttachment.displayName ?: pendingAttachment.mimeType,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    IconButton(onClick = onClearAttachment, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = "Remove", modifier = Modifier.size(14.dp))
+                    pendingAttachments.forEachIndexed { index, attachment ->
+                        Icon(Icons.Default.Image, contentDescription = null, tint = AmberPrimary, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = attachment.displayName ?: "Image ${index + 1}",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        IconButton(onClick = { onRemoveAttachment(index) }, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Default.Close, contentDescription = "Remove image ${index + 1}", modifier = Modifier.size(14.dp))
+                        }
+                        if (index != pendingAttachments.lastIndex) {
+                            Spacer(Modifier.width(8.dp))
+                        }
                     }
                 }
             }
@@ -87,7 +97,7 @@ fun ChatInputBar(
             ) {
                 IconButton(
                     onClick = onPickImage,
-                    enabled = canSend && !isSending,
+                    enabled = !isSending,
                     modifier = Modifier.padding(start = 8.dp)
                 ) {
                     Icon(Icons.Default.Image, contentDescription = "Upload image", tint = MaterialTheme.colorScheme.onSurfaceVariant)

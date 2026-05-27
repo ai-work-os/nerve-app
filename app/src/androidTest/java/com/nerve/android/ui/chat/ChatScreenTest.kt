@@ -80,7 +80,7 @@ class ChatScreenTest {
                     errorMessage = "boom",
                 ),
                 streamingText = "partial reply",
-                onSend = { sentText = it },
+                onSend = { text, _ -> sentText = text },
                 onPickImage = {},
                 onCancel = { cancelCalls += 1 },
             )
@@ -114,7 +114,7 @@ class ChatScreenTest {
                     isSending = true,
                 ),
                 streamingText = "",
-                onSend = {},
+                onSend = { _, _ -> },
                 onPickImage = {},
                 onCancel = {},
             )
@@ -135,7 +135,7 @@ class ChatScreenTest {
                     isStreaming = true,
                 ),
                 streamingText = "",
-                onSend = {},
+                onSend = { _, _ -> },
                 onPickImage = {},
                 onCancel = {},
             )
@@ -167,7 +167,7 @@ class ChatScreenTest {
                     ),
                 ),
                 streamingText = "",
-                onSend = {},
+                onSend = { _, _ -> },
                 onPickImage = {},
                 onCancel = {},
                 onOpenDm = { serverId, nodeId, nodeName ->
@@ -540,7 +540,11 @@ private class RecordingNerveClient : NerveClient {
         unsubscribeCalls += nodeId
     }
 
-    override suspend fun prompt(nodeId: String, content: String, attachment: com.nerve.android.transport.PromptAttachment?): PromptResult {
+    override suspend fun prompt(
+        nodeId: String,
+        content: String,
+        attachments: List<com.nerve.android.transport.PromptAttachment>,
+    ): PromptResult {
         promptCalls += nodeId to content
         return PromptResult(stopReason = "stop")
     }

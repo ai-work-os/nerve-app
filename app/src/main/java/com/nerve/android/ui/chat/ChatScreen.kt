@@ -18,14 +18,14 @@ fun ChatScreen(
     streamingText: String,
     streamingBlocks: List<ContentBlock> = emptyList(),
     canSend: Boolean = true,
-    onSend: (String) -> Unit,
+    onSend: (String, List<PendingAttachment>) -> Unit,
     onPickImage: () -> Unit,
     onCancel: () -> Unit,
     onStop: (() -> Unit)? = null,
     onBack: (() -> Unit)? = null,
     onOpenDm: ((String, String, String) -> Unit)? = null,
-    pendingAttachment: PendingAttachment? = null,
-    onClearAttachment: () -> Unit = {},
+    pendingAttachments: List<PendingAttachment> = emptyList(),
+    onRemoveAttachment: (Int) -> Unit = {},
     onRetry: (String) -> Unit = {},
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -73,8 +73,8 @@ fun ChatScreen(
                     isSending = state.isSending,
                     onSend = onSend,
                     onPickImage = onPickImage,
-                    pendingAttachment = pendingAttachment,
-                    onClearAttachment = onClearAttachment,
+                    pendingAttachments = pendingAttachments,
+                    onRemoveAttachment = onRemoveAttachment,
                 )
             }
         }

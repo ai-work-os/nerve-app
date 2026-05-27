@@ -304,7 +304,7 @@ class ChatViewModelTest {
     }
 
     @Test
-    fun `sendImage sends prompt with image attachment and local user message`() = runTest {
+    fun `sendImages sends prompt with image attachments and local user message`() = runTest {
         val sessionManager = DmSessionManager()
         val mapper = DmEventMapper()
         val registry = FakeServerRegistry()
@@ -313,11 +313,20 @@ class ChatViewModelTest {
         val vm = ChatViewModel(sessionManager, mapper, registry, Dispatchers.Unconfined)
 
         vm.enterDm("s1", "n1", "bot")
-        vm.sendImage("see this", "image/png", "abc123")
+        vm.sendImages(
+            "see this",
+            listOf(
+                com.nerve.android.transport.PromptAttachment.Image("image/png", "abc123"),
+                com.nerve.android.transport.PromptAttachment.Image("image/jpeg", "def456"),
+            ),
+        )
 
         assertEquals(listOf("n1" to "see this"), client.promptCalls)
-        assertEquals(listOf("image/png:abc123"), client.imagePromptCalls)
-        assertTrue(vm.uiState.value.messages.any { it.role == DmRole.USER && it.content == "see this\n[image:image/png]" })
+        assertEquals(listOf("image/png:abc123", "image/jpeg:def456"), client.imagePromptCalls)
+        assertTrue(vm.uiState.value.messages.any {
+            it.role == DmRole.USER &&
+                it.content == "see this\n[image:image/png]\n[image:image/jpeg]"
+        })
     }
 
     @Test

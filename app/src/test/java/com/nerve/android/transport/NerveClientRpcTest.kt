@@ -126,7 +126,7 @@ class NerveClientRpcTest {
     }
 
     @Test
-    fun `prompt with image sends attachment payload`() = runTest {
+    fun `prompt with images sends attachment payloads`() = runTest {
         val server = FakeNerveWsServer()
         val client = RealNerveClient(server.url, backoffStrategy = FakeBackoffStrategy())
         try {
@@ -137,16 +137,27 @@ class NerveClientRpcTest {
                 """{"stopReason":"end_turn"}"""
             }
 
-            client.prompt("n1", "look", PromptAttachment.Image(mimeType = "image/png", data = "abc123"))
+            client.prompt(
+                "n1",
+                "look",
+                listOf(
+                    PromptAttachment.Image(mimeType = "image/png", data = "abc123"),
+                    PromptAttachment.Image(mimeType = "image/jpeg", data = "def456"),
+                ),
+            )
 
             val params = server.takeClientMessageAsJson().params
             assertEquals("n1", params["nodeId"])
             assertEquals("look", params["content"])
             @Suppress("UNCHECKED_CAST")
-            val image = (params["attachments"] as List<Map<String, Any?>>).first()
-            assertEquals("image", image["type"])
-            assertEquals("image/png", image["mimeType"])
-            assertEquals("abc123", image["data"])
+            val images = params["attachments"] as List<Map<String, Any?>>
+            assertEquals(2, images.size)
+            assertEquals("image", images[0]["type"])
+            assertEquals("image/png", images[0]["mimeType"])
+            assertEquals("abc123", images[0]["data"])
+            assertEquals("image", images[1]["type"])
+            assertEquals("image/jpeg", images[1]["mimeType"])
+            assertEquals("def456", images[1]["data"])
         } finally {
             client.disconnect()
         }

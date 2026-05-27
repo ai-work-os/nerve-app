@@ -110,7 +110,7 @@ fun ChannelChatScreen(
                 ChatInputBar(
                     canSend = true,
                     isSending = isPosting,
-                    onSend = onSend,
+                    onSend = { text, _ -> onSend(text) },
                     onPickImage = {},
                 )
             }

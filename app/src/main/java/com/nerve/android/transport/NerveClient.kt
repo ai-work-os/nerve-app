@@ -30,7 +30,11 @@ interface NerveClient {
     suspend fun listChannels(): List<ChannelInfo>
     suspend fun subscribe(nodeId: String)
     suspend fun unsubscribe(nodeId: String)
-    suspend fun prompt(nodeId: String, content: String, attachment: PromptAttachment? = null): PromptResult
+    suspend fun prompt(
+        nodeId: String,
+        content: String,
+        attachments: List<PromptAttachment> = emptyList(),
+    ): PromptResult
     suspend fun spawnNode(adapter: String, name: String?, cwd: String?): SpawnResult
     suspend fun cancelNode(nodeId: String)
     suspend fun stopNode(nodeId: String)
