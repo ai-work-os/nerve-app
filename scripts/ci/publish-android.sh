@@ -11,6 +11,7 @@ APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
 VERSION_FILE="${PUBLISH_ROOT}/nerve-app-version.json"
 APK_TARGET="${PUBLISH_ROOT}/nerve-app.apk"
 DEFAULT_KEYSTORE="${HOME}/.nerve/secrets/nerve-app-mac-debug.keystore"
+DEFAULT_CERT_SHA256="caf8021e3d8f16fb6b3d3c813a3298eaf499563187cdc9e059cebaf5a8aa10c8"
 
 if [[ -z "${NERVE_ANDROID_KEYSTORE:-}" && -f "${DEFAULT_KEYSTORE}" ]]; then
   export NERVE_ANDROID_KEYSTORE="${DEFAULT_KEYSTORE}"
@@ -18,6 +19,18 @@ if [[ -z "${NERVE_ANDROID_KEYSTORE:-}" && -f "${DEFAULT_KEYSTORE}" ]]; then
   export NERVE_ANDROID_KEY_ALIAS="${NERVE_ANDROID_KEY_ALIAS:-androiddebugkey}"
   export NERVE_ANDROID_KEY_PASSWORD="${NERVE_ANDROID_KEY_PASSWORD:-${NERVE_ANDROID_KEYSTORE_PASSWORD}}"
 fi
+
+if [[ -z "${NERVE_ANDROID_KEYSTORE:-}" ]]; then
+  echo "NERVE_ANDROID_KEYSTORE is required for release publishing; expected default at ${DEFAULT_KEYSTORE}" >&2
+  exit 1
+fi
+
+if [[ ! -r "${NERVE_ANDROID_KEYSTORE}" ]]; then
+  echo "NERVE_ANDROID_KEYSTORE is not readable: ${NERVE_ANDROID_KEYSTORE}" >&2
+  exit 1
+fi
+
+export NERVE_ANDROID_CERT_SHA256="${NERVE_ANDROID_CERT_SHA256:-${DEFAULT_CERT_SHA256}}"
 
 read_gradle_value() {
   local key="$1"
