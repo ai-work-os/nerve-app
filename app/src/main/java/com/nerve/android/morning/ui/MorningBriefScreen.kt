@@ -31,7 +31,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.nerve.android.morning.MorningBriefPresentation
 import com.nerve.android.morning.MorningBriefSection
+import com.nerve.android.ui.theme.AmberPrimary
+import com.nerve.android.ui.theme.StoneMuted
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,41 +66,65 @@ fun MorningBriefScreen(vm: MorningBriefViewModel) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             val brief = vm.brief
+            val presentation = MorningBriefPresentation.from(brief = brief, loading = vm.loading, error = vm.error)
             if (brief == null) {
                 Spacer(Modifier.height(48.dp))
                 Text(
-                    text = if (vm.loading) "Loading morning brief..." else "No morning brief yet",
+                    text = presentation.title,
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Black,
                 )
-                vm.error?.let {
-                    Text(it, color = MaterialTheme.colorScheme.error)
+                presentation.statusMessage?.let {
+                    StatusText(it)
                 }
                 Button(onClick = { vm.refresh() }) {
                     Text("Refresh")
                 }
             } else {
                 Text(
-                    text = brief.date,
+                    text = presentation.sourceLabel.ifBlank { brief.date },
                     style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = StoneMuted,
                     modifier = Modifier.padding(top = 8.dp),
                 )
                 Text(
-                    text = brief.notificationBody,
-                    style = MaterialTheme.typography.headlineSmall,
+                    text = presentation.title,
+                    style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Black,
                 )
-                brief.sections.forEach { section ->
-                    BriefSectionCard(section)
+                if (presentation.summary.isNotBlank()) {
+                    ElevatedCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(18.dp),
+                        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    ) {
+                        Text(
+                            text = presentation.summary,
+                            modifier = Modifier.padding(18.dp),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
                 }
-                vm.error?.let {
-                    Text(it, color = MaterialTheme.colorScheme.error)
+                presentation.statusMessage?.let {
+                    StatusText(it)
+                }
+                presentation.sections.forEach { section ->
+                    BriefSectionCard(section)
                 }
             }
             Spacer(Modifier.height(120.dp))
         }
     }
+}
+
+@Composable
+private fun StatusText(text: String) {
+    Text(
+        text = text,
+        color = StoneMuted,
+        style = MaterialTheme.typography.bodySmall,
+    )
 }
 
 @Composable
@@ -114,7 +141,7 @@ private fun BriefSectionCard(section: MorningBriefSection) {
             Text(section.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
             section.items.forEach { item ->
                 Row(verticalAlignment = Alignment.Top) {
-                    Text("•", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Black)
+                    Text("•", color = AmberPrimary, fontWeight = FontWeight.Black)
                     Text(
                         text = item,
                         modifier = Modifier.padding(start = 8.dp),

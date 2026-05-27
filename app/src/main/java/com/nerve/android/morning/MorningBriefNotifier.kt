@@ -37,11 +37,14 @@ object MorningBriefNotifier {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
+        val presentation = MorningBriefPresentation.from(brief = brief, loading = false, error = null)
+        val notificationText = presentation.summary.ifBlank { brief.notificationBody }
+
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(brief.notificationTitle)
-            .setContentText(brief.notificationBody)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(brief.notificationBody))
+            .setContentText(notificationText)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(notificationText))
             .setContentIntent(contentIntent)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
