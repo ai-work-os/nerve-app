@@ -6,9 +6,11 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertCountEquals
@@ -20,6 +22,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.nerve.android.MainActivity
 import com.nerve.android.NerveApp
@@ -241,6 +244,49 @@ class ChatScreenTest {
         check(!markdownTextView.includeFontPadding)
         val background = markdownTextView.background as? ColorDrawable
         check(background?.color == Color.TRANSPARENT)
+    }
+
+    @Test
+    fun adjacentAssistantMarkdownBubbles_keepReadableVerticalSeparation() {
+        var expectedGapPx = 0f
+        composeRule.setContent {
+            val density = LocalDensity.current
+            expectedGapPx = with(density) { 8.dp.toPx() }
+            Column {
+                MessageBubble(
+                    message = DmMessage(
+                        id = "markdown-1",
+                        role = DmRole.ASSISTANT,
+                        content = """
+                            ```kotlin
+                            println("first")
+                            ```
+                        """.trimIndent(),
+                        timestamp = 100L,
+                        nodeId = "n1",
+                        nodeName = "bot",
+                    ),
+                    testTag = "assistant-markdown-first",
+                )
+                MessageBubble(
+                    message = DmMessage(
+                        id = "markdown-2",
+                        role = DmRole.ASSISTANT,
+                        content = "说明 `inline code` should not press into the previous block.",
+                        timestamp = 101L,
+                        nodeId = "n1",
+                        nodeName = "bot",
+                    ),
+                    testTag = "assistant-markdown-second",
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        val first = composeRule.onNodeWithTag("assistant-markdown-first").fetchSemanticsNode().boundsInRoot
+        val second = composeRule.onNodeWithTag("assistant-markdown-second").fetchSemanticsNode().boundsInRoot
+
+        check(second.top - first.bottom >= expectedGapPx)
     }
 
     @Test
