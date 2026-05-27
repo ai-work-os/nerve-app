@@ -1,0 +1,35 @@
+stages:
+  - test
+  - release
+
+default:
+  tags:
+    - home
+  before_script:
+    - chmod +x ./gradlew
+
+android_test:
+  stage: test
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_COMMIT_BRANCH'
+  script:
+    - ./gradlew :app:testDebugUnitTest
+
+android_release:
+  stage: release
+  needs:
+    - android_test
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"'
+      when: manual
+    - when: never
+  script:
+    - bash scripts/ci/publish-android.sh
+  artifacts:
+    when: always
+    expire_in: 14 days
+    paths:
+      - app/build/outputs/apk/debug/app-debug.apk
+      - app/build/outputs/nerve-app-version.json
