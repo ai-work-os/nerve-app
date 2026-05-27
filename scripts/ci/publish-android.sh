@@ -10,6 +10,14 @@ APK_URL="${NERVE_APK_URL:-http://100.75.43.90/nerve-app.apk}"
 APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
 VERSION_FILE="${PUBLISH_ROOT}/nerve-app-version.json"
 APK_TARGET="${PUBLISH_ROOT}/nerve-app.apk"
+DEFAULT_KEYSTORE="${HOME}/.nerve/secrets/nerve-app-mac-debug.keystore"
+
+if [[ -z "${NERVE_ANDROID_KEYSTORE:-}" && -f "${DEFAULT_KEYSTORE}" ]]; then
+  export NERVE_ANDROID_KEYSTORE="${DEFAULT_KEYSTORE}"
+  export NERVE_ANDROID_KEYSTORE_PASSWORD="${NERVE_ANDROID_KEYSTORE_PASSWORD:-android}"
+  export NERVE_ANDROID_KEY_ALIAS="${NERVE_ANDROID_KEY_ALIAS:-androiddebugkey}"
+  export NERVE_ANDROID_KEY_PASSWORD="${NERVE_ANDROID_KEY_PASSWORD:-${NERVE_ANDROID_KEYSTORE_PASSWORD}}"
+fi
 
 read_gradle_value() {
   local key="$1"
@@ -36,6 +44,19 @@ find_aapt() {
   for sdk in "${ANDROID_HOME:-}" "${ANDROID_SDK_ROOT:-}" "${HOME}/Android/Sdk" "/opt/android-sdk" "/usr/lib/android-sdk"; do
     [[ -n "${sdk}" && -d "${sdk}/build-tools" ]] || continue
     find "${sdk}/build-tools" -type f -name aapt -perm -111 2>/dev/null | sort -V | tail -n 1
+  done | tail -n 1
+}
+
+find_apksigner() {
+  if [[ -n "${APKSIGNER:-}" && -x "${APKSIGNER}" ]]; then
+    printf '%s\n' "${APKSIGNER}"
+    return 0
+  fi
+
+  local sdk
+  for sdk in "${ANDROID_HOME:-}" "${ANDROID_SDK_ROOT:-}" "${HOME}/Android/Sdk" "/opt/android-sdk" "/usr/lib/android-sdk"; do
+    [[ -n "${sdk}" && -d "${sdk}/build-tools" ]] || continue
+    find "${sdk}/build-tools" -type f -name apksigner -perm -111 2>/dev/null | sort -V | tail -n 1
   done | tail -n 1
 }
 
@@ -72,6 +93,12 @@ if [[ -z "${aapt}" || ! -x "${aapt}" ]]; then
   exit 1
 fi
 
+apksigner="$(find_apksigner)"
+if [[ -z "${apksigner}" || ! -x "${apksigner}" ]]; then
+  echo "apksigner not found. Set APKSIGNER or install Android SDK build-tools under ANDROID_HOME." >&2
+  exit 1
+fi
+
 badging="$("${aapt}" dump badging "${APK_PATH}")"
 package_line="${badging%%$'\n'*}"
 apk_version_code="$(printf '%s\n' "${package_line}" | sed -nE "s/.*versionCode='([^']+)'.*/\1/p")"
@@ -80,6 +107,17 @@ apk_version_name="$(printf '%s\n' "${package_line}" | sed -nE "s/.*versionName='
 if [[ "${apk_version_code}" != "${version_code}" || "${apk_version_name}" != "${version_name}" ]]; then
   echo "APK version mismatch: gradle=${version_code}/${version_name}, apk=${apk_version_code}/${apk_version_name}" >&2
   exit 1
+fi
+
+"${apksigner}" verify --verbose "${APK_PATH}" >/dev/null
+apk_cert_sha256="$("${apksigner}" verify --print-certs "${APK_PATH}" | sed -nE 's/^Signer #1 certificate SHA-256 digest: //p' | tr '[:upper:]' '[:lower:]')"
+expected_cert_sha256="${NERVE_ANDROID_CERT_SHA256:-}"
+if [[ -n "${expected_cert_sha256}" ]]; then
+  expected_cert_sha256="$(printf '%s' "${expected_cert_sha256}" | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+  if [[ "${apk_cert_sha256}" != "${expected_cert_sha256}" ]]; then
+    echo "APK signing cert mismatch: expected=${expected_cert_sha256}, apk=${apk_cert_sha256}" >&2
+    exit 1
+  fi
 fi
 
 tmp_dir="$(mktemp -d)"
@@ -113,4 +151,11 @@ if [[ "${published_code}" != "${version_code}" || "${published_name}" != "${vers
   exit 1
 fi
 
+published_cert_sha256="$("${apksigner}" verify --print-certs "${APK_TARGET}" | sed -nE 's/^Signer #1 certificate SHA-256 digest: //p' | tr '[:upper:]' '[:lower:]')"
+if [[ "${published_cert_sha256}" != "${apk_cert_sha256}" ]]; then
+  echo "Published APK signing cert mismatch: built=${apk_cert_sha256}, published=${published_cert_sha256}" >&2
+  exit 1
+fi
+
 echo "Published ${APK_TARGET} and ${VERSION_FILE} (${version_code}/${version_name})"
+echo "Signing cert SHA-256: ${published_cert_sha256}"
