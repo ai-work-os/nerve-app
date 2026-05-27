@@ -135,7 +135,7 @@ fun MessageBubble(
     }
 
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
         verticalAlignment = Alignment.Top,
     ) {
