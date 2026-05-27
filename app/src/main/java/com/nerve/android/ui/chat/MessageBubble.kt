@@ -3,6 +3,7 @@ package com.nerve.android.ui.chat
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.graphics.Color as AndroidColor
 import android.graphics.Typeface
 import android.widget.TextView
 import android.widget.Toast
@@ -66,12 +67,16 @@ fun MarkdownText(content: String, modifier: Modifier = Modifier) {
                 .build()
             TextView(context).apply {
                 setTextColor(textColor)
+                setBackgroundColor(AndroidColor.TRANSPARENT)
+                includeFontPadding = false
                 tag = markwon
                 setTextIsSelectable(true)
             }
         },
         update = { textView ->
             textView.setTextColor(textColor)
+            textView.setBackgroundColor(AndroidColor.TRANSPARENT)
+            textView.includeFontPadding = false
             val markwon = textView.tag as Markwon
             markwon.setMarkdown(textView, content)
         },
@@ -111,6 +116,9 @@ fun MessageBubble(
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val visibleContent = message.textContent.ifBlank { message.content }
+    val bubbleShape = RoundedCornerShape(24.dp).let {
+        if (isUser) it.copy(topEnd = CornerSize(0.dp)) else it.copy(topStart = CornerSize(0.dp))
+    }
     val copyMessage = {
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -158,14 +166,13 @@ fun MessageBubble(
             }
 
             Surface(
-                shape = RoundedCornerShape(24.dp).let {
-                    if (isUser) it.copy(topEnd = CornerSize(0.dp)) else it.copy(topStart = CornerSize(0.dp))
-                },
+                shape = bubbleShape,
                 color = if (isUser) StoneMain else WhiteSurface,
                 shadowElevation = if (isUser) 4.dp else 1.dp,
                 border = if (!isUser) androidx.compose.foundation.BorderStroke(1.dp, AmberPrimary.copy(alpha = 0.1f)) else null,
                 modifier = Modifier
                     .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
+                    .clip(bubbleShape)
             ) {
                 Box(
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp)
