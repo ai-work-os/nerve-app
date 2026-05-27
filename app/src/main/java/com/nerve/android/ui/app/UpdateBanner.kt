@@ -102,6 +102,9 @@ fun UpdateBanner(
                         )
                     }
                     is DownloadState.Ready -> {
+                        TextButton(onClick = onDismiss) {
+                            Text("Later", color = Color.White.copy(alpha = 0.5f))
+                        }
                         Button(
                             onClick = onUpdate,
                             colors = ButtonDefaults.buttonColors(containerColor = Color.White),
