@@ -18,6 +18,18 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        getByName("debug") {
+            val envStoreFile = System.getenv("NERVE_ANDROID_KEYSTORE")
+            if (!envStoreFile.isNullOrBlank()) {
+                storeFile = file(envStoreFile)
+                storePassword = System.getenv("NERVE_ANDROID_KEYSTORE_PASSWORD") ?: "android"
+                keyAlias = System.getenv("NERVE_ANDROID_KEY_ALIAS") ?: "androiddebugkey"
+                keyPassword = System.getenv("NERVE_ANDROID_KEY_PASSWORD") ?: storePassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
