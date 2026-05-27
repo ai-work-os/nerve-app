@@ -1,6 +1,5 @@
 package com.nerve.android.ui.chat
 
-import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.view.View
 import android.view.ViewGroup
@@ -20,6 +19,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.graphics.toArgb
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.nerve.android.MainActivity
 import com.nerve.android.NerveApp
@@ -44,6 +44,7 @@ import com.nerve.android.transport.model.ChannelInfo
 import com.nerve.android.transport.model.NodeInfo
 import com.nerve.android.transport.model.PromptResult
 import com.nerve.android.transport.model.SpawnResult
+import com.nerve.android.ui.theme.WhiteSurface
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -205,7 +206,7 @@ class ChatScreenTest {
     }
 
     @Test
-    fun assistantMarkdown_usesTransparentTextViewWithoutExtraFontPadding() {
+    fun assistantMarkdown_usesBubbleBackgroundWithoutExtraFontPadding() {
         composeRule.setContent {
             MessageBubble(
                 message = DmMessage(
@@ -240,7 +241,7 @@ class ChatScreenTest {
 
         check(!markdownTextView.includeFontPadding)
         val background = markdownTextView.background as? ColorDrawable
-        check(background?.color == Color.TRANSPARENT)
+        check(background?.color == WhiteSurface.toArgb())
     }
 
     @Test

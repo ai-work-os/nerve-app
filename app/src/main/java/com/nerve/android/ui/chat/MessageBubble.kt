@@ -3,7 +3,6 @@ package com.nerve.android.ui.chat
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.graphics.Color as AndroidColor
 import android.graphics.Typeface
 import android.widget.TextView
 import android.widget.Toast
@@ -50,8 +49,13 @@ import java.util.Date
 import java.util.Locale
 
 @Composable
-fun MarkdownText(content: String, modifier: Modifier = Modifier) {
+fun MarkdownText(
+    content: String,
+    modifier: Modifier = Modifier,
+    backgroundColor: Color = Color.Transparent,
+) {
     val textColor = LocalContentColor.current.toArgb()
+    val textBackgroundColor = backgroundColor.toArgb()
     AndroidView(
         modifier = modifier,
         factory = { context ->
@@ -67,7 +71,7 @@ fun MarkdownText(content: String, modifier: Modifier = Modifier) {
                 .build()
             TextView(context).apply {
                 setTextColor(textColor)
-                setBackgroundColor(AndroidColor.TRANSPARENT)
+                setBackgroundColor(textBackgroundColor)
                 includeFontPadding = false
                 tag = markwon
                 setTextIsSelectable(true)
@@ -75,13 +79,16 @@ fun MarkdownText(content: String, modifier: Modifier = Modifier) {
         },
         update = { textView ->
             textView.setTextColor(textColor)
-            textView.setBackgroundColor(AndroidColor.TRANSPARENT)
+            textView.setBackgroundColor(textBackgroundColor)
             textView.includeFontPadding = false
             val markwon = textView.tag as Markwon
             markwon.setMarkdown(textView, content)
         },
     )
 }
+
+internal fun markdownTextBackgroundColor(isUser: Boolean): Color =
+    if (isUser) StoneMain else WhiteSurface
 
 @Composable
 private fun SmallAvatar(label: String, isUser: Boolean) {
@@ -116,6 +123,7 @@ fun MessageBubble(
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val visibleContent = message.textContent.ifBlank { message.content }
+    val bubbleColor = markdownTextBackgroundColor(isUser)
     val bubbleShape = RoundedCornerShape(24.dp).let {
         if (isUser) it.copy(topEnd = CornerSize(0.dp)) else it.copy(topStart = CornerSize(0.dp))
     }
@@ -167,7 +175,7 @@ fun MessageBubble(
 
             Surface(
                 shape = bubbleShape,
-                color = if (isUser) StoneMain else WhiteSurface,
+                color = bubbleColor,
                 shadowElevation = if (isUser) 4.dp else 1.dp,
                 border = if (!isUser) androidx.compose.foundation.BorderStroke(1.dp, AmberPrimary.copy(alpha = 0.1f)) else null,
                 modifier = Modifier
@@ -183,7 +191,10 @@ fun MessageBubble(
                             LocalContentColor provides if (isUser) AmberPrimary else MaterialTheme.colorScheme.onSurface
                         ) {
                             if (action == null) {
-                                MarkdownText(visibleContent)
+                                MarkdownText(
+                                    content = visibleContent,
+                                    backgroundColor = bubbleColor,
+                                )
                             } else {
                                 Text(visibleContent, fontWeight = FontWeight.Bold)
                             }
