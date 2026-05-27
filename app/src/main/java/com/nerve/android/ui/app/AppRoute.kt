@@ -188,12 +188,14 @@ fun AppRoute(app: NerveApp) {
                             download = downloadState,
                             onUpdate = {
                                 when (val state = downloadState) {
-                                    is DownloadState.Ready -> ApkInstaller.launchInstall(context, state.file)
+                                    is DownloadState.Ready -> {
+                                        ApkInstaller.launchInstall(context, state.file)
+                                        updateViewModel.installLaunched()
+                                    }
                                     else -> updateViewModel.startDownload()
                                 }
                             },
                             onDismiss = {
-                                updateViewModel.resetDownload()
                                 updateViewModel.dismiss()
                             },
                             onRetry = { updateViewModel.startDownload() },

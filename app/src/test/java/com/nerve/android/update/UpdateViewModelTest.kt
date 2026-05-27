@@ -42,6 +42,24 @@ class UpdateViewModelTest {
         )
     }
 
+    private fun vmWithRemoteSequence(
+        versionCodes: List<Int>,
+        current: Int = 1,
+        downloader: ApkDownloader = ApkDownloader(),
+    ): UpdateViewModel {
+        var index = 0
+        return UpdateViewModel(
+            checker = UpdateChecker(currentVersionCode = current) {
+                val versionCode = versionCodes[index.coerceAtMost(versionCodes.lastIndex)]
+                index += 1
+                """{"versionCode":$versionCode,"versionName":"x","url":"http://h/x.apk"}"""
+            },
+            dispatcher = dispatcher,
+            downloader = downloader,
+            cacheDirProvider = { java.io.File(System.getProperty("java.io.tmpdir") ?: ".") },
+        )
+    }
+
     @Test
     fun `state begins Unknown`() {
         val vm = vmWithRemote(versionCode = 5)
@@ -99,5 +117,55 @@ class UpdateViewModelTest {
         assertNull(vm.dismissedVersionCode.value)
         vm.dismiss()
         assertEquals(5, vm.dismissedVersionCode.value)
+    }
+
+    @Test
+    fun `dismiss from Ready records version and clears download`() = runTest(dispatcher) {
+        val fakeDownloader = FakeDownloader(outcome = FakeOutcome.Success(bytes = 4096))
+        val vm = vmWithRemote(versionCode = 5, current = 1, downloader = fakeDownloader)
+        vm.refresh()
+        advanceUntilIdle()
+        vm.startDownload()
+        advanceUntilIdle()
+        assertTrue(vm.download.value is DownloadState.Ready)
+
+        vm.dismiss()
+
+        assertEquals(5, vm.dismissedVersionCode.value)
+        assertEquals(DownloadState.Idle, vm.download.value)
+    }
+
+    @Test
+    fun `refresh to UpToDate clears stale Ready download`() = runTest(dispatcher) {
+        val fakeDownloader = FakeDownloader(outcome = FakeOutcome.Success(bytes = 4096))
+        val vm = vmWithRemoteSequence(versionCodes = listOf(5, 1), current = 1, downloader = fakeDownloader)
+        vm.refresh()
+        advanceUntilIdle()
+        vm.startDownload()
+        advanceUntilIdle()
+        assertTrue(vm.download.value is DownloadState.Ready)
+
+        vm.refresh()
+        advanceUntilIdle()
+
+        assertEquals(UpdateState.UpToDate, vm.state.value)
+        assertEquals(DownloadState.Idle, vm.download.value)
+    }
+
+    @Test
+    fun `install launched resets Ready download for retry after returning`() = runTest(dispatcher) {
+        val fakeDownloader = FakeDownloader(outcome = FakeOutcome.Success(bytes = 4096))
+        val vm = vmWithRemote(versionCode = 5, current = 1, downloader = fakeDownloader)
+        vm.refresh()
+        advanceUntilIdle()
+        vm.startDownload()
+        advanceUntilIdle()
+        assertTrue(vm.download.value is DownloadState.Ready)
+
+        vm.installLaunched()
+
+        assertEquals(DownloadState.Idle, vm.download.value)
+        assertNull(vm.dismissedVersionCode.value)
+        assertTrue(vm.state.value is UpdateState.Available)
     }
 }

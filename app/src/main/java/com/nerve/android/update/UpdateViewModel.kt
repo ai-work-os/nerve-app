@@ -40,7 +40,16 @@ class UpdateViewModel(
     fun refresh() {
         scope.launch {
             Logger.debug("UpdateViewModel", "refresh_begin", emptyMap())
-            _state.value = checker.check()
+            val result = checker.check()
+            _state.value = result
+            if (result !is UpdateState.Available && _download.value !is DownloadState.Idle) {
+                Logger.debug(
+                    "UpdateViewModel",
+                    "refresh_clear_download",
+                    mapOf("state" to result::class.simpleName.orEmpty()),
+                )
+                resetDownload()
+            }
         }
     }
 
@@ -53,7 +62,22 @@ class UpdateViewModel(
                 "dismiss",
                 mapOf("versionCode" to current.info.versionCode),
             )
+            resetDownload()
         }
+    }
+
+    fun installLaunched() {
+        val current = _state.value
+        val download = _download.value
+        Logger.debug(
+            "UpdateViewModel",
+            "install_launched",
+            mapOf(
+                "versionCode" to ((current as? UpdateState.Available)?.info?.versionCode ?: -1),
+                "download" to download::class.simpleName.orEmpty(),
+            ),
+        )
+        resetDownload()
     }
 
     fun startDownload() {
