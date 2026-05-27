@@ -68,6 +68,7 @@ class RealNerveClient(
     private val state = MutableStateFlow(ConnectionState.DISCONNECTED)
     private val eventFlow = MutableSharedFlow<NerveEvent>(extraBufferCapacity = 32)
     private val nextRequestId = AtomicLong(1)
+    private val currentSocketGeneration = AtomicLong(0)
     private val pending = ConcurrentHashMap<Long, CompletableDeferred<JsonElement>>()
     private val bufferedResponses = ConcurrentHashMap<Long, RpcResponse>()
     private val subscribedNodeIds = linkedSetOf<String>()
@@ -221,6 +222,7 @@ class RealNerveClient(
     }
 
     private suspend fun openSocket(url: String) {
+        val socketGeneration = currentSocketGeneration.incrementAndGet()
         val opened = CompletableDeferred<ClientSocket>()
         val listener = object : ClientSocketListener {
             override fun onOpen() {
@@ -229,23 +231,27 @@ class RealNerveClient(
             }
 
             override fun onMessage(text: String) {
-                handleIncoming(text)
+                if (isCurrentSocket(socketGeneration)) {
+                    handleIncoming(text)
+                } else {
+                    Logger.debug("NerveClient", "socket_message_ignored", mapOf("reason" to "stale_socket"))
+                }
             }
 
             override fun onClosing(code: Int, reason: String) {
                 Logger.warn("NerveClient", "socket_closing", mapOf("code" to code, "reason" to reason))
-                handleSocketLoss()
+                handleSocketLoss(socketGeneration)
             }
 
             override fun onClosed(code: Int, reason: String) {
                 Logger.warn("NerveClient", "socket_closed", mapOf("code" to code, "reason" to reason))
-                handleSocketLoss()
+                handleSocketLoss(socketGeneration)
             }
 
             override fun onFailure(throwable: Throwable) {
                 Logger.error("NerveClient", "socket_failure", mapOf("reason" to throwable.message), throwable)
                 if (!opened.isCompleted) opened.completeExceptionally(throwable)
-                handleSocketLoss()
+                handleSocketLoss(socketGeneration)
             }
         }
         val loopbackSocket = SocketEndpointRegistry.connect(url, listener)
@@ -317,7 +323,14 @@ class RealNerveClient(
         }
     }
 
-    private fun handleSocketLoss() {
+    private fun isCurrentSocket(socketGeneration: Long): Boolean =
+        currentSocketGeneration.get() == socketGeneration
+
+    private fun handleSocketLoss(socketGeneration: Long) {
+        if (!isCurrentSocket(socketGeneration)) {
+            Logger.debug("NerveClient", "socket_loss_ignored", mapOf("reason" to "stale_socket"))
+            return
+        }
         socket = null
         failPending(RpcException.TransportDisconnected())
         if (manualDisconnect) return

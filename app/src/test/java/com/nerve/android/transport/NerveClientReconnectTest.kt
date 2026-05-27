@@ -43,4 +43,35 @@ class NerveClientReconnectTest {
             client.disconnect()
         }
     }
+
+    @Test
+    fun `stale close from previous socket does not fail reconnect registration`() = runTest {
+        val server = FakeNerveWsServer()
+        val client = RealNerveClient(server.url, backoffStrategy = FakeBackoffStrategy(delayMs = 0))
+        try {
+            server.enqueueRegisterSuccess()
+            client.connect(
+                ServerConfig("s1", "home", server.address()),
+                ClientRegistration(name = "android-ui"),
+            )
+            assertEquals("node.register", server.takeClientMessageAsJson().method)
+
+            server.closeConnection()
+            assertEquals(ConnectionState.RECONNECTING, client.connectionState.value)
+
+            server.enqueueRegisterSuccessAfterClosingConnection(connectionIndex = 0)
+            advanceUntilIdle()
+            val secondRegister = server.takeClientMessageAsJson()
+            assertEquals("node.register", secondRegister.method)
+            repeat(20) {
+                if (client.connectionState.value == ConnectionState.CONNECTED) return@repeat
+                advanceUntilIdle()
+                Thread.sleep(10)
+            }
+
+            assertEquals(ConnectionState.CONNECTED, client.connectionState.value)
+        } finally {
+            client.disconnect()
+        }
+    }
 }

@@ -23,6 +23,7 @@ class FakeNerveWsServer {
     private val scripts = mutableMapOf<String, ArrayDeque<(Long?) -> Unit>>()
     private val inbound = LinkedBlockingQueue<RecordedClientMessage>()
     private val methods = mutableListOf<String>()
+    private val listeners = mutableListOf<ClientSocketListener>()
     private var listener: ClientSocketListener? = null
     private val key = "fake-${counter.incrementAndGet()}:4800"
 
@@ -31,6 +32,7 @@ class FakeNerveWsServer {
     init {
         SocketEndpointRegistry.register(url) { socketListener ->
             listener = socketListener
+            listeners += socketListener
             object : ClientSocket {
                 override fun send(text: String): Boolean {
                     handleClientMessage(text)
@@ -38,7 +40,7 @@ class FakeNerveWsServer {
                 }
 
                 override fun close(code: Int, reason: String): Boolean {
-                    listener?.onClosed(code, reason)
+                    socketListener.onClosed(code, reason)
                     return true
                 }
             }
@@ -49,6 +51,13 @@ class FakeNerveWsServer {
 
     fun enqueueRegisterSuccess() {
         enqueueScript("node.register") { id ->
+            sendResponse(id, """{"nodeId":"android-ui"}""")
+        }
+    }
+
+    fun enqueueRegisterSuccessAfterClosingConnection(connectionIndex: Int) {
+        enqueueScript("node.register") { id ->
+            listeners.getOrNull(connectionIndex)?.onClosed(1005, "")
             sendResponse(id, """{"nodeId":"android-ui"}""")
         }
     }
