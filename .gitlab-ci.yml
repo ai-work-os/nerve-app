@@ -23,7 +23,6 @@ android_release:
     - android_test
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"'
-      when: manual
     - when: never
   script:
     - bash scripts/ci/publish-android.sh
