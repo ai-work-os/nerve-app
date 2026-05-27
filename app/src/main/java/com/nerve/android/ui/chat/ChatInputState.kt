@@ -6,8 +6,9 @@ internal object ChatInputState {
         hasAttachment: Boolean,
         canSend: Boolean,
         isSending: Boolean,
+        isStreaming: Boolean = false,
     ): Boolean {
-        if (!canSend || isSending) return false
+        if (!canSend || isSending || isStreaming) return false
         return text.isNotBlank() || hasAttachment
     }
 }

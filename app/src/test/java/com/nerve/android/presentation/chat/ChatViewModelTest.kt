@@ -330,6 +330,30 @@ class ChatViewModelTest {
     }
 
     @Test
+    fun `sendImages does not prompt while streaming`() = runTest {
+        val sessionManager = DmSessionManager()
+        val mapper = DmEventMapper()
+        val registry = FakeServerRegistry()
+        val client = FakeNerveClient()
+        registry.clients["s1"] = client
+        val vm = ChatViewModel(sessionManager, mapper, registry, Dispatchers.Unconfined)
+
+        vm.enterDm("s1", "n1", "bot")
+        registry.events.emit(
+            scoped("s1", nodeUpdateEvent("n1", "bot", "agent_message_chunk", text = "partial")),
+        )
+
+        vm.sendImages(
+            "draft",
+            listOf(com.nerve.android.transport.PromptAttachment.Image("image/png", "abc123")),
+        )
+
+        assertTrue(client.promptCalls.isEmpty())
+        assertTrue(client.imagePromptCalls.isEmpty())
+        assertFalse(vm.uiState.value.messages.any { it.role == DmRole.USER && it.content.contains("draft") })
+    }
+
+    @Test
     fun `thinking chunk sets isStreaming true`() = runTest {
         val sessionManager = DmSessionManager()
         val mapper = DmEventMapper()

@@ -71,6 +71,7 @@ fun ChatScreen(
                 ChatInputBar(
                     canSend = canSend,
                     isSending = state.isSending,
+                    isStreaming = state.isStreaming,
                     onSend = onSend,
                     onPickImage = onPickImage,
                     pendingAttachments = pendingAttachments,
