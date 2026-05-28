@@ -50,6 +50,7 @@ fun MessageList(
     }
     val listState = rememberLazyListState()
     var hasScrolledToBottomInitially by remember { mutableStateOf(false) }
+    var previousTotalItems by remember { mutableStateOf(0) }
 
     // Initial scroll to bottom
     LaunchedEffect(visibleMessages.isNotEmpty()) {
@@ -57,6 +58,7 @@ fun MessageList(
             val extra = if (isStreaming) 1 else 0
             val target = (visibleMessages.size + extra - 1).coerceAtLeast(0)
             listState.scrollToItem(target)
+            previousTotalItems = visibleMessages.size + extra
             hasScrolledToBottomInitially = true
         }
     }
@@ -66,15 +68,20 @@ fun MessageList(
         if (!hasScrolledToBottomInitially) return@LaunchedEffect
         
         val extra = if (isStreaming) 1 else 0
-        val target = (visibleMessages.size + extra - 1).coerceAtLeast(0)
+        val totalItems = visibleMessages.size + extra
+        val target = (totalItems - 1).coerceAtLeast(0)
+        val itemCountChanged = totalItems != previousTotalItems
+        val lastVisibleIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index
         
-        val isAtBottom = if (listState.layoutInfo.visibleItemsInfo.isEmpty()) true 
-                        else listState.layoutInfo.visibleItemsInfo.last().index >= listState.layoutInfo.totalItemsCount - 2
-        
-        if (isAtBottom || isStreaming) {
+        if (shouldAutoScrollMessageList(totalItems, lastVisibleIndex, isStreaming, itemCountChanged)) {
             onAutoScroll?.invoke()
-            listState.animateScrollToItem(target)
+            if (isStreaming && !itemCountChanged) {
+                listState.scrollToItem(target)
+            } else {
+                listState.animateScrollToItem(target)
+            }
         }
+        previousTotalItems = totalItems
     }
 
     LazyColumn(
@@ -124,6 +131,19 @@ fun MessageList(
             }
         }
     }
+}
+
+internal fun shouldAutoScrollMessageList(
+    totalItems: Int,
+    lastVisibleIndex: Int?,
+    isStreaming: Boolean,
+    itemCountChanged: Boolean,
+    bottomThreshold: Int = 1,
+): Boolean {
+    if (!isStreaming && !itemCountChanged) return false
+    if (totalItems <= 0 || lastVisibleIndex == null) return true
+    val bottomIndex = totalItems - 1
+    return lastVisibleIndex >= bottomIndex - bottomThreshold
 }
 
 @Composable
