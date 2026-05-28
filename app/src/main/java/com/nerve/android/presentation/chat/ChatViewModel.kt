@@ -150,6 +150,9 @@ class ChatViewModel(
                             )
                             if (mapped != DmMappedEvent.Ignore) {
                                 sessionManager.onEvent(mapped)
+                                if (mapped is DmMappedEvent.AgentMessageEnd || mapped is DmMappedEvent.NodeIdle) {
+                                    _uiState.value = _uiState.value.copy(isSending = false)
+                                }
                             }
                         }
                     }

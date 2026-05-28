@@ -11,6 +11,7 @@ import com.nerve.android.transport.model.ChannelInfo
 import com.nerve.android.transport.model.NodeInfo
 import com.nerve.android.transport.model.PromptResult
 import com.nerve.android.transport.model.SpawnResult
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.Json
@@ -45,6 +46,7 @@ class FakeNerveClient : NerveClient {
     val callResults: MutableMap<String, Result<JsonElement>> = mutableMapOf()
     var subscribeResult: Result<Unit> = Result.success(Unit)
     var unsubscribeResult: Result<Unit> = Result.success(Unit)
+    var promptGate: CompletableDeferred<Unit>? = null
     var promptResult: Result<PromptResult> = Result.success(PromptResult(stopReason = "stop"))
     var spawnResult: Result<SpawnResult> = Result.success(SpawnResult(nodeId = "n1"))
     var stopResult: Result<Unit> = Result.success(Unit)
@@ -90,6 +92,7 @@ class FakeNerveClient : NerveClient {
 
     override suspend fun prompt(nodeId: String, content: String, attachments: List<PromptAttachment>): PromptResult {
         promptCalls += nodeId to content
+        promptGate?.await()
         attachments.forEach { attachment ->
             if (attachment is PromptAttachment.Image) {
                 imagePromptCalls += "${attachment.mimeType}:${attachment.data}"

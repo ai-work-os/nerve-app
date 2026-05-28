@@ -15,7 +15,9 @@ import com.nerve.android.transport.NerveEvent
 import com.nerve.android.transport.RpcException
 import com.nerve.android.transport.SnapshotAction
 import com.nerve.android.transport.SnapshotMessage
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -429,6 +431,38 @@ class ChatViewModelTest {
         registry.events.emit(scoped("s1", idleEvent("n1")))
         assertFalse(vm.uiState.value.isStreaming,
             "node idle must reset isStreaming even without agent_message_end")
+    }
+
+    @Test
+    fun `agent end releases sending state even when prompt call has not returned`() = runTest {
+        val sessionManager = DmSessionManager()
+        val mapper = DmEventMapper()
+        val registry = FakeServerRegistry()
+        val client = FakeNerveClient()
+        client.promptGate = CompletableDeferred()
+        registry.clients["s1"] = client
+        val vm = ChatViewModel(sessionManager, mapper, registry, Dispatchers.Unconfined)
+
+        vm.enterDm("s1", "n1", "bot")
+
+        val sendJob = launch { vm.sendMessage("ping") }
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.isSending, "prompt call is still in flight")
+
+        registry.events.emit(
+            scoped("s1", nodeUpdateEvent("n1", "bot", "agent_message_chunk", text = "answer")),
+        )
+        assertTrue(vm.uiState.value.isStreaming)
+
+        registry.events.emit(
+            scoped("s1", nodeUpdateEvent("n1", "bot", "agent_message_end")),
+        )
+
+        assertFalse(vm.uiState.value.isStreaming)
+        assertFalse(vm.uiState.value.isSending, "input should unlock when the agent is done")
+
+        client.promptGate!!.complete(Unit)
+        sendJob.join()
     }
 
     @Test
