@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -49,7 +50,7 @@ fun AppRoute(app: NerveApp) {
     val dismissedVersion by updateViewModel.dismissedVersionCode.collectAsState()
     val downloadState by updateViewModel.download.collectAsState()
     val scope = rememberCoroutineScope()
-    val nav = remember { AppNavigation() }
+    val nav = rememberSaveable(saver = AppNavigationSaver) { AppNavigation() }
     val nodesGridState = rememberLazyStaggeredGridState()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
