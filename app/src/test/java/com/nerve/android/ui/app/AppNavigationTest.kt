@@ -57,6 +57,36 @@ class AppNavigationTest {
     }
 
     @Test
+    fun `saved state restores chat screen after activity recreation`() {
+        val nav = AppNavigation()
+        nav.selectTab(1)
+        nav.openChat("s1", "n1", "bot")
+
+        val restored = AppNavigation.fromSavedState(nav.toSavedState())
+
+        val screen = assertIs<AppScreen.Chat>(restored.screen)
+        assertEquals("s1", screen.serverId)
+        assertEquals("n1", screen.nodeId)
+        assertEquals("bot", screen.nodeName)
+        assertEquals(1, restored.selectedTab)
+    }
+
+    @Test
+    fun `saved state restores channel chat screen after activity recreation`() {
+        val nav = AppNavigation()
+        nav.selectTab(1)
+        nav.openChannelChat("s1", "c1", "general")
+
+        val restored = AppNavigation.fromSavedState(nav.toSavedState())
+
+        val screen = assertIs<AppScreen.ChannelChat>(restored.screen)
+        assertEquals("s1", screen.serverId)
+        assertEquals("c1", screen.channelId)
+        assertEquals("general", screen.channelName)
+        assertEquals(1, restored.selectedTab)
+    }
+
+    @Test
     fun `navigating to channel chat changes screen`() {
         val nav = AppNavigation()
         nav.openChannelChat("s1", "c1", "general")

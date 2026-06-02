@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.Saver
 import com.nerve.android.domain.server.ServerNode
 import com.nerve.android.transport.ServerConfig
 
@@ -14,10 +15,13 @@ sealed interface AppScreen {
     data class ChannelChat(val serverId: String, val channelId: String, val channelName: String) : AppScreen
 }
 
-class AppNavigation {
-    var screen: AppScreen by mutableStateOf(AppScreen.Main)
+class AppNavigation(
+    initialScreen: AppScreen = AppScreen.Main,
+    initialSelectedTab: Int = 0,
+) {
+    var screen: AppScreen by mutableStateOf(initialScreen)
         private set
-    var selectedTab: Int by mutableIntStateOf(0)
+    var selectedTab: Int by mutableIntStateOf(initialSelectedTab.coerceIn(0, 3))
         private set
     var transientError: String? by mutableStateOf(null)
         private set
@@ -77,4 +81,61 @@ class AppNavigation {
         }
         back()
     }
+
+    fun toSavedState(): List<String> {
+        val tab = selectedTab.toString()
+        return when (val current = screen) {
+            AppScreen.Main -> listOf(SCREEN_MAIN, tab)
+            AppScreen.Servers -> listOf(SCREEN_SERVERS, tab)
+            is AppScreen.Chat -> listOf(SCREEN_CHAT, tab, current.serverId, current.nodeId, current.nodeName)
+            is AppScreen.ChannelChat -> listOf(
+                SCREEN_CHANNEL_CHAT,
+                tab,
+                current.serverId,
+                current.channelId,
+                current.channelName,
+            )
+        }
+    }
+
+    companion object {
+        private const val SCREEN_MAIN = "main"
+        private const val SCREEN_SERVERS = "servers"
+        private const val SCREEN_CHAT = "chat"
+        private const val SCREEN_CHANNEL_CHAT = "channel_chat"
+
+        fun fromSavedState(saved: List<String>): AppNavigation {
+            val tab = saved.getOrNull(1)?.toIntOrNull()?.coerceIn(0, 3) ?: 0
+            val screen = when (saved.firstOrNull()) {
+                SCREEN_SERVERS -> AppScreen.Servers
+                SCREEN_CHAT -> {
+                    val serverId = saved.getOrNull(2)
+                    val nodeId = saved.getOrNull(3)
+                    val nodeName = saved.getOrNull(4)
+                    if (serverId != null && nodeId != null && nodeName != null) {
+                        AppScreen.Chat(serverId, nodeId, nodeName)
+                    } else {
+                        AppScreen.Main
+                    }
+                }
+                SCREEN_CHANNEL_CHAT -> {
+                    val serverId = saved.getOrNull(2)
+                    val channelId = saved.getOrNull(3)
+                    val channelName = saved.getOrNull(4)
+                    if (serverId != null && channelId != null && channelName != null) {
+                        AppScreen.ChannelChat(serverId, channelId, channelName)
+                    } else {
+                        AppScreen.Main
+                    }
+                }
+                else -> AppScreen.Main
+            }
+            return AppNavigation(initialScreen = screen, initialSelectedTab = tab)
+        }
+    }
 }
+
+val AppNavigationSaver: Saver<AppNavigation, List<String>> = Saver(
+    save = { it.toSavedState() },
+    restore = { AppNavigation.fromSavedState(it) },
+)
