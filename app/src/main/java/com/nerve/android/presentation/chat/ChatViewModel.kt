@@ -12,10 +12,15 @@ import com.nerve.android.domain.server.ServerRegistry
 import com.nerve.android.transport.NerveEvent
 import com.nerve.android.transport.PromptAttachment
 import com.nerve.android.transport.SnapshotMessage
+import com.nerve.android.upload.FileUploadClient
+import com.nerve.android.upload.FileUploader
+import com.nerve.android.upload.PendingFileUpload
+import com.nerve.android.upload.UploadedFile
 import com.nerve.android.util.Logger
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -24,11 +29,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import okhttp3.OkHttpClient
 
 class ChatViewModel(
     private val sessionManager: DmSessionManager,
@@ -36,6 +43,7 @@ class ChatViewModel(
     private val serverRegistry: ServerRegistry,
     dispatcher: CoroutineDispatcher,
     private val onSubscribed: ((String, String) -> Unit)? = null,
+    private val fileUploader: FileUploadClient = FileUploader(OkHttpClient()),
 ) : ViewModel() {
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -343,6 +351,71 @@ class ChatViewModel(
         _uiState.value = _uiState.value.copy(isSending = false)
     }
 
+    suspend fun sendFiles(caption: String, files: List<PendingFileUpload>) {
+        if (files.isEmpty()) return
+        if (_uiState.value.isStreaming || _uiState.value.isSending) return
+        val serverId = currentServerId ?: return
+        val nodeId = currentNodeId ?: return
+        val nodeName = _uiState.value.nodeName ?: nodeId
+        val server = serverRegistry.servers.value.firstOrNull { it.id == serverId } ?: run {
+            _uiState.value = _uiState.value.copy(errorMessage = "server config not found")
+            return
+        }
+        Logger.debug(
+            "ChatViewModel",
+            "dm_file_send_begin",
+            mapOf("serverId" to serverId, "nodeId" to nodeId, "fileCount" to files.size),
+        )
+        _uiState.value = _uiState.value.copy(isSending = true, errorMessage = null)
+        val uploadResult = runCatching {
+            withContext(Dispatchers.IO) {
+                files.map { fileUploader.upload(server.httpUrl(), it) }
+            }
+        }
+        if (uploadResult.isFailure) {
+            val error = uploadResult.exceptionOrNull()
+            Logger.warn(
+                "ChatViewModel",
+                "dm_file_upload_fail",
+                mapOf("serverId" to serverId, "nodeId" to nodeId, "reason" to error?.message),
+            )
+            val failedId = "local-file-failed-${System.currentTimeMillis()}"
+            _uiState.value = _uiState.value.copy(
+                isSending = false,
+                errorMessage = error?.message,
+                failedMessages = _uiState.value.failedMessages + (failedId to caption),
+            )
+            return
+        }
+
+        val uploaded = uploadResult.getOrThrow()
+        val prompt = buildFilePrompt(caption, uploaded)
+        val messageId = "local-file-${System.currentTimeMillis()}"
+        sessionManager.onEvent(
+            DmMappedEvent.UserMessage(
+                nodeId = nodeId,
+                nodeName = nodeName,
+                content = prompt,
+                timestamp = System.currentTimeMillis(),
+                messageId = messageId,
+            ),
+        )
+        runCatching {
+            serverRegistry.client(serverId)?.prompt(nodeId, prompt)
+        }.onFailure {
+            Logger.warn(
+                "ChatViewModel",
+                "dm_send_fail",
+                mapOf("serverId" to serverId, "nodeId" to nodeId, "reason" to it.message),
+            )
+            _uiState.value = _uiState.value.copy(
+                errorMessage = it.message,
+                failedMessages = _uiState.value.failedMessages + (messageId to prompt),
+            )
+        }
+        _uiState.value = _uiState.value.copy(isSending = false)
+    }
+
     private suspend fun loadSessionHistory(serverId: String, nodeId: String, nodeName: String) {
         val client = serverRegistry.client(serverId) ?: return
         runCatching {
@@ -378,5 +451,21 @@ class ChatViewModel(
     override fun onCleared() {
         scope.cancel()
         super.onCleared()
+    }
+}
+
+private fun buildFilePrompt(caption: String, files: List<UploadedFile>): String = buildString {
+    append("我上传了文件，请读取并参考：")
+    files.forEach { file ->
+        append("\n- name: ${file.name}")
+        append("\n  path: ${file.path}")
+        append("\n  mime: ${file.mimeType}")
+        append("\n  size: ${file.sizeBytes} bytes")
+        append("\n  sha256: ${file.sha256}")
+    }
+    val trimmed = caption.trim()
+    if (trimmed.isNotEmpty()) {
+        append("\n\n")
+        append(trimmed)
     }
 }

@@ -20,6 +20,7 @@ fun ChatScreen(
     canSend: Boolean = true,
     onSend: (String, List<PendingAttachment>) -> Unit,
     onPickImage: () -> Unit,
+    onPickFile: () -> Unit = {},
     onCancel: () -> Unit,
     onStop: (() -> Unit)? = null,
     onBack: (() -> Unit)? = null,
@@ -74,6 +75,7 @@ fun ChatScreen(
                     isStreaming = state.isStreaming,
                     onSend = onSend,
                     onPickImage = onPickImage,
+                    onPickFile = onPickFile,
                     pendingAttachments = pendingAttachments,
                     onRemoveAttachment = onRemoveAttachment,
                 )

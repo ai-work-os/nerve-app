@@ -1,6 +1,8 @@
 package com.nerve.android.ui.chat
 
 import android.util.Base64
+import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
@@ -16,6 +18,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.nerve.android.domain.server.ServerRegistry
 import com.nerve.android.presentation.chat.ChatViewModel
 import com.nerve.android.transport.PromptAttachment
+import com.nerve.android.upload.PendingFileUpload
 import com.nerve.android.util.Logger
 import kotlinx.coroutines.launch
 
@@ -49,7 +52,30 @@ fun ChatRoute(
             PendingAttachment(
                 mimeType = mimeType,
                 base64Data = base64,
-                displayName = uri.lastPathSegment,
+                displayName = context.displayName(uri),
+                kind = Kind.IMAGE,
+                sizeBytes = bytes.size.toLong(),
+            )
+        }
+        pendingAttachments = pendingAttachments + attachments
+    }
+    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
+        if (uris.isEmpty()) return@rememberLauncherForActivityResult
+        val resolver = context.contentResolver
+        val attachments = uris.mapNotNull { uri ->
+            val mimeType = resolver.getType(uri) ?: "application/octet-stream"
+            val bytes = resolver.openInputStream(uri)?.use { it.readBytes() } ?: return@mapNotNull null
+            Logger.debug(
+                "ChatRoute",
+                "dm_file_picked",
+                mapOf("serverId" to serverId, "nodeId" to nodeId, "mime" to mimeType, "bytes" to bytes.size),
+            )
+            PendingAttachment(
+                mimeType = mimeType,
+                displayName = context.displayName(uri),
+                bytes = bytes,
+                kind = Kind.FILE,
+                sizeBytes = bytes.size.toLong(),
             )
         }
         pendingAttachments = pendingAttachments + attachments
@@ -78,7 +104,33 @@ fun ChatRoute(
         streamingBlocks = state.streamingMessage?.blocks ?: emptyList(),
         canSend = !state.isStreaming,
         onSend = { text, attachments ->
-            if (attachments.isNotEmpty()) {
+            val fileAttachments = attachments.filter { it.kind == Kind.FILE }
+            val imageAttachments = attachments.filter { it.kind == Kind.IMAGE }
+            if (fileAttachments.isNotEmpty()) {
+                Logger.debug(
+                    "ChatRoute",
+                    "dm_send_with_file_begin",
+                    mapOf(
+                        "serverId" to serverId,
+                        "nodeId" to nodeId,
+                        "len" to text.length,
+                        "fileCount" to fileAttachments.size,
+                    ),
+                )
+                pendingAttachments = emptyList()
+                scope.launch {
+                    viewModel.sendFiles(
+                        text,
+                        fileAttachments.map {
+                            PendingFileUpload(
+                                name = it.displayName ?: "upload.bin",
+                                mimeType = it.mimeType,
+                                bytes = it.bytes ?: ByteArray(0),
+                            )
+                        },
+                    )
+                }
+            } else if (imageAttachments.isNotEmpty()) {
                 Logger.debug(
                     "ChatRoute",
                     "dm_send_with_image_begin",
@@ -86,14 +138,18 @@ fun ChatRoute(
                         "serverId" to serverId,
                         "nodeId" to nodeId,
                         "len" to text.length,
-                        "imageCount" to attachments.size,
+                        "imageCount" to imageAttachments.size,
                     ),
                 )
                 pendingAttachments = emptyList()
                 scope.launch {
                     viewModel.sendImages(
                         text,
-                        attachments.map { PromptAttachment.Image(mimeType = it.mimeType, data = it.base64Data) },
+                        imageAttachments.mapNotNull { attachment ->
+                            attachment.base64Data?.let { data ->
+                                PromptAttachment.Image(mimeType = attachment.mimeType, data = data)
+                            }
+                        },
                     )
                 }
             } else {
@@ -106,6 +162,7 @@ fun ChatRoute(
             }
         },
         onPickImage = { imagePicker.launch("image/*") },
+        onPickFile = { filePicker.launch("*/*") },
         onRetry = { messageId ->
             Logger.debug("ChatRoute", "dm_retry", mapOf("serverId" to serverId, "nodeId" to nodeId, "messageId" to messageId))
             scope.launch { viewModel.retryMessage(messageId) }
@@ -122,8 +179,18 @@ fun ChatRoute(
         onOpenDm = onOpenDm,
         pendingAttachments = pendingAttachments,
         onRemoveAttachment = { index ->
-            Logger.debug("ChatRoute", "dm_image_cleared", mapOf("serverId" to serverId, "nodeId" to nodeId, "index" to index))
+            Logger.debug("ChatRoute", "dm_attachment_cleared", mapOf("serverId" to serverId, "nodeId" to nodeId, "index" to index))
             pendingAttachments = pendingAttachments.filterIndexed { i, _ -> i != index }
         },
     )
+}
+
+private fun android.content.Context.displayName(uri: Uri): String? {
+    contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+        if (cursor.moveToFirst()) {
+            val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (index >= 0) return cursor.getString(index)
+        }
+    }
+    return uri.lastPathSegment
 }
