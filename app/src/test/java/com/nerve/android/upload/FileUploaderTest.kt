@@ -62,7 +62,7 @@ class FileUploaderTest {
         assertEquals("POST", req.method)
         assertEquals("/files/upload", req.path)
         assertEquals("text/markdown", req.getHeader("Content-Type"))
-        assertEquals("notes.md", req.getHeader("X-File-Name"))
+        assertEquals("notes.md", req.getHeader("X-File-Name-Encoded"))
         assertEquals("# hi\n", req.body.readUtf8())
     }
 
@@ -78,5 +78,32 @@ class FileUploaderTest {
         }
 
         assertEquals("file too large", error.message)
+    }
+
+    @Test
+    fun `url encodes unicode filename header`() {
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setBody(
+                    """
+                    {
+                      "path": "/home/renjinxi/.nerve/uploads/2026-06-04/abc.md",
+                      "name": "需求说明.md",
+                      "mimeType": "text/markdown",
+                      "sizeBytes": 5,
+                      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                    }
+                    """.trimIndent(),
+                ),
+        )
+
+        uploader.upload(
+            baseUrl = server.url("/").toString().trimEnd('/'),
+            file = PendingFileUpload("需求说明.md", "text/markdown", "# hi\n".toByteArray()),
+        )
+
+        val req = server.takeRequest()
+        assertEquals("%E9%9C%80%E6%B1%82%E8%AF%B4%E6%98%8E.md", req.getHeader("X-File-Name-Encoded"))
     }
 }

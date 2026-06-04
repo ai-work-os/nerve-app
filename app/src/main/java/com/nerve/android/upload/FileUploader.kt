@@ -9,6 +9,8 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 
 data class PendingFileUpload(
     val name: String,
@@ -39,7 +41,7 @@ class FileUploader(
         val body = file.bytes.toRequestBody(file.mimeType.toMediaType())
         val req = Request.Builder()
             .url("${baseUrl.trimEnd('/')}/files/upload")
-            .header("X-File-Name", file.name)
+            .header("X-File-Name-Encoded", encodeHeaderFileName(file.name))
             .post(body)
             .build()
         try {
@@ -61,4 +63,7 @@ class FileUploader(
         runCatching {
             json.parseToJsonElement(raw).jsonObject["error"]?.jsonPrimitive?.content
         }.getOrNull()
+
+    private fun encodeHeaderFileName(name: String): String =
+        URLEncoder.encode(name, StandardCharsets.UTF_8.toString()).replace("+", "%20")
 }
