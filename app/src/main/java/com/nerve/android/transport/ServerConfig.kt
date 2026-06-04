@@ -13,4 +13,11 @@ data class ServerConfig(
     } else {
         "ws://$address"
     }
+
+    fun httpUrl(): String = when {
+        address.startsWith("wss://") -> "https://${address.removePrefix("wss://")}"
+        address.startsWith("ws://") -> "http://${address.removePrefix("ws://")}"
+        address.startsWith("https://") || address.startsWith("http://") -> address
+        else -> "http://$address"
+    }
 }

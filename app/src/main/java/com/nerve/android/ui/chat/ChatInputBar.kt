@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -29,6 +30,7 @@ fun ChatInputBar(
     isStreaming: Boolean = false,
     onSend: (String, List<PendingAttachment>) -> Unit,
     onPickImage: () -> Unit,
+    onPickFile: () -> Unit = {},
     pendingAttachments: List<PendingAttachment> = emptyList(),
     onRemoveAttachment: (Int) -> Unit = {},
 ) {
@@ -67,16 +69,21 @@ fun ChatInputBar(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     pendingAttachments.forEachIndexed { index, attachment ->
-                        Icon(Icons.Default.Image, contentDescription = null, tint = AmberPrimary, modifier = Modifier.size(16.dp))
+                        Icon(
+                            if (attachment.kind == Kind.IMAGE) Icons.Default.Image else Icons.Default.AttachFile,
+                            contentDescription = null,
+                            tint = AmberPrimary,
+                            modifier = Modifier.size(16.dp),
+                        )
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            text = attachment.displayName ?: "Image ${index + 1}",
+                            text = attachment.displayName ?: if (attachment.kind == Kind.IMAGE) "Image ${index + 1}" else "File ${index + 1}",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(Modifier.width(8.dp))
                         IconButton(onClick = { onRemoveAttachment(index) }, modifier = Modifier.size(24.dp)) {
-                            Icon(Icons.Default.Close, contentDescription = "Remove image ${index + 1}", modifier = Modifier.size(14.dp))
+                            Icon(Icons.Default.Close, contentDescription = "Remove attachment ${index + 1}", modifier = Modifier.size(14.dp))
                         }
                         if (index != pendingAttachments.lastIndex) {
                             Spacer(Modifier.width(8.dp))
@@ -103,6 +110,13 @@ fun ChatInputBar(
                     modifier = Modifier.padding(start = 8.dp)
                 ) {
                     Icon(Icons.Default.Image, contentDescription = "Upload image", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+
+                IconButton(
+                    onClick = onPickFile,
+                    enabled = !isSending,
+                ) {
+                    Icon(Icons.Default.AttachFile, contentDescription = "Upload file", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
 
                 TextField(

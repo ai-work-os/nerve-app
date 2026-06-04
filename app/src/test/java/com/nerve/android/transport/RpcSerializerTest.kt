@@ -107,4 +107,11 @@ class RpcSerializerTest {
         assertEquals("ws://127.0.0.1:4800", ServerConfig("s1", "local", "127.0.0.1:4800").webSocketUrl())
         assertEquals("ws://host:4800", ServerConfig("s1", "local", "ws://host:4800").webSocketUrl())
     }
+
+    @Test
+    fun `server config formats http url for upload`() {
+        assertEquals("http://127.0.0.1:4800", ServerConfig("s1", "local", "127.0.0.1:4800").httpUrl())
+        assertEquals("http://host:4800", ServerConfig("s1", "local", "ws://host:4800").httpUrl())
+        assertEquals("https://host:4800", ServerConfig("s1", "local", "wss://host:4800").httpUrl())
+    }
 }

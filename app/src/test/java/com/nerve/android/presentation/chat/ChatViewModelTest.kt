@@ -13,8 +13,12 @@ import com.nerve.android.domain.server.ServerScopedEvent
 import com.nerve.android.presentation.FakeServerRegistry
 import com.nerve.android.transport.NerveEvent
 import com.nerve.android.transport.RpcException
+import com.nerve.android.transport.ServerConfig
 import com.nerve.android.transport.SnapshotAction
 import com.nerve.android.transport.SnapshotMessage
+import com.nerve.android.upload.FileUploadClient
+import com.nerve.android.upload.PendingFileUpload
+import com.nerve.android.upload.UploadedFile
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -353,6 +357,65 @@ class ChatViewModelTest {
         assertTrue(client.promptCalls.isEmpty())
         assertTrue(client.imagePromptCalls.isEmpty())
         assertFalse(vm.uiState.value.messages.any { it.role == DmRole.USER && it.content.contains("draft") })
+    }
+
+    @Test
+    fun `sendFiles uploads files then sends prompt with server paths`() = runTest {
+        val sessionManager = DmSessionManager()
+        val mapper = DmEventMapper()
+        val registry = FakeServerRegistry()
+        val client = FakeNerveClient()
+        registry.clients["s1"] = client
+        registry.servers.value = listOf(ServerConfig("s1", "Home", "10.0.0.1:4800"))
+        val uploader = FakeFileUploadClient(
+            listOf(
+                UploadedFile(
+                    path = "/home/renjinxi/.nerve/uploads/2026-06-04/abc-notes.md",
+                    name = "notes.md",
+                    mimeType = "text/markdown",
+                    sizeBytes = 12,
+                    sha256 = "abc",
+                ),
+            ),
+        )
+        val vm = ChatViewModel(sessionManager, mapper, registry, Dispatchers.Unconfined, fileUploader = uploader)
+
+        vm.enterDm("s1", "n1", "bot")
+        vm.sendFiles(
+            caption = "summarize",
+            files = listOf(PendingFileUpload("notes.md", "text/markdown", "# hi\n".toByteArray())),
+        )
+
+        assertEquals(listOf("http://10.0.0.1:4800" to "notes.md"), uploader.uploadCalls)
+        val prompt = client.promptCalls.single().second
+        assertTrue(prompt.contains("summarize"))
+        assertTrue(prompt.contains("name: notes.md"))
+        assertTrue(prompt.contains("mime: text/markdown"))
+        assertTrue(prompt.contains("size: 12 bytes"))
+        assertTrue(prompt.contains("path: /home/renjinxi/.nerve/uploads/2026-06-04/abc-notes.md"))
+        assertTrue(vm.uiState.value.messages.any { it.role == DmRole.USER && it.content == prompt })
+    }
+
+    @Test
+    fun `sendFiles shows upload error and does not drop typed prompt`() = runTest {
+        val sessionManager = DmSessionManager()
+        val mapper = DmEventMapper()
+        val registry = FakeServerRegistry()
+        val client = FakeNerveClient()
+        registry.clients["s1"] = client
+        registry.servers.value = listOf(ServerConfig("s1", "Home", "10.0.0.1:4800"))
+        val uploader = FakeFileUploadClient(emptyList(), IllegalStateException("file too large"))
+        val vm = ChatViewModel(sessionManager, mapper, registry, Dispatchers.Unconfined, fileUploader = uploader)
+
+        vm.enterDm("s1", "n1", "bot")
+        vm.sendFiles(
+            caption = "please read",
+            files = listOf(PendingFileUpload("big.zip", "application/zip", ByteArray(5))),
+        )
+
+        assertTrue(client.promptCalls.isEmpty())
+        assertEquals("file too large", vm.uiState.value.errorMessage)
+        assertTrue(vm.uiState.value.failedMessages.values.contains("please read"))
     }
 
     @Test
@@ -788,5 +851,19 @@ class ChatViewModelTest {
         val method = ViewModel::class.java.getDeclaredMethod("onCleared")
         method.isAccessible = true
         method.invoke(viewModel)
+    }
+}
+
+private class FakeFileUploadClient(
+    private val results: List<UploadedFile>,
+    private val error: Throwable? = null,
+) : FileUploadClient {
+    val uploadCalls = mutableListOf<Pair<String, String>>()
+    private var index = 0
+
+    override fun upload(baseUrl: String, file: PendingFileUpload): UploadedFile {
+        uploadCalls += baseUrl to file.name
+        error?.let { throw it }
+        return results[index++]
     }
 }
