@@ -15,7 +15,9 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -98,10 +100,10 @@ class ChatScreenTest {
         composeRule.onNodeWithText("bot").assertIsDisplayed()
         composeRule.onNodeWithText("Thinking").assertIsDisplayed()
         composeRule.onNodeWithText("Cancel").assertIsDisplayed()
-        composeRule.onNodeWithText("Message").performTextInput("ping")
+        composeRule.onNodeWithText("问问 Nerve").performTextInput("ping")
         composeRule.onNodeWithText("Cancel").performClick()
         composeRule.onNodeWithText("Send").performClick()
-        composeRule.onNodeWithText("Message").assertTextEquals("")
+        composeRule.onNodeWithText("问问 Nerve").assertTextEquals("")
         composeRule.onAllNodesWithText("ping").assertCountEquals(0)
         check(sentText == "ping")
         check(cancelCalls == 1)
@@ -126,6 +128,75 @@ class ChatScreenTest {
 
         composeRule.onNodeWithText("Send").assertIsNotEnabled()
         composeRule.onNodeWithText("Sending").assertIsDisplayed()
+    }
+
+    @Test
+    fun chatScreen_attachmentMenuUsesSinglePlusEntryPoint() {
+        var imagePickCalls = 0
+        var filePickCalls = 0
+        composeRule.setContent {
+            ChatScreen(
+                state = ChatUiState(
+                    serverId = "s1",
+                    nodeId = "n1",
+                    nodeName = "bot",
+                ),
+                streamingText = "",
+                onSend = { _, _ -> },
+                onPickImage = { imagePickCalls += 1 },
+                onPickFile = { filePickCalls += 1 },
+                onCancel = {},
+            )
+        }
+
+        composeRule.onNodeWithContentDescription("Open attachment menu").performClick()
+        composeRule.onNodeWithText("照片").assertIsDisplayed()
+        composeRule.onNodeWithText("文件").assertIsDisplayed()
+
+        composeRule.onNodeWithText("照片").performClick()
+        composeRule.waitForIdle()
+        check(imagePickCalls == 1)
+
+        composeRule.onNodeWithContentDescription("Open attachment menu").performClick()
+        composeRule.onNodeWithText("文件").performClick()
+        composeRule.waitForIdle()
+        check(filePickCalls == 1)
+
+        composeRule.onAllNodesWithContentDescription("Upload image").assertCountEquals(0)
+        composeRule.onAllNodesWithContentDescription("Upload file").assertCountEquals(0)
+    }
+
+    @Test
+    fun chatScreen_attachmentChipCanBeRemovedFromInputArea() {
+        var removeIndex: Int? = null
+        composeRule.setContent {
+            ChatScreen(
+                state = ChatUiState(
+                    serverId = "s1",
+                    nodeId = "n1",
+                    nodeName = "bot",
+                ),
+                streamingText = "",
+                onSend = { _, _ -> },
+                onPickImage = {},
+                onCancel = {},
+                pendingAttachments = listOf(
+                    PendingAttachment(
+                        mimeType = "image/jpeg",
+                        displayName = "1000004319.jpg",
+                        bytes = ByteArray(1),
+                        kind = Kind.IMAGE,
+                        sizeBytes = 1L,
+                    ),
+                ),
+                onRemoveAttachment = { removeIndex = it },
+            )
+        }
+
+        composeRule.onNodeWithText("1000004319.jpg").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Remove attachment 1").performClick()
+
+        check(removeIndex == 0)
     }
 
     @Test
@@ -358,8 +429,8 @@ class ChatScreenTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithText("from-store").assertIsDisplayed()
 
-        composeRule.onNodeWithText("Message").performTextInput("hello route")
-        composeRule.onNodeWithText("Message").performImeAction()
+        composeRule.onNodeWithText("问问 Nerve").performTextInput("hello route")
+        composeRule.onNodeWithText("问问 Nerve").performImeAction()
         composeRule.waitForIdle()
         check(client.promptCalls == listOf("n1" to "hello route"))
 
@@ -519,7 +590,7 @@ class MainActivityChatSmokeTest {
         check(debugInt("debugStartCalls") == 1)
         check(debugList("debugEnteredDmKeys") == listOf("s1:n1"))
         activityRule.onAllNodesWithText("Nerve App").assertCountEquals(0)
-        activityRule.onNodeWithText("Message").assertIsDisplayed()
+        activityRule.onNodeWithText("问问 Nerve").assertIsDisplayed()
         activityRule.onNodeWithText("Send").assertIsDisplayed()
         activityRule.onNodeWithText("Cancel").assertIsDisplayed()
         activityRule.onNodeWithText("Start the conversation").assertIsDisplayed()
