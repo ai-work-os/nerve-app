@@ -129,6 +129,42 @@ class ChatScreenTest {
     }
 
     @Test
+    fun chatScreen_keepsLastMessageAboveFloatingInputWithAttachments() {
+        composeRule.setContent {
+            ChatScreen(
+                state = ChatUiState(
+                    serverId = "s1",
+                    nodeId = "n1",
+                    nodeName = "bot",
+                    messages = listOf(
+                        DmMessage("m1", DmRole.ASSISTANT, "older message", 100L, "n1", "bot"),
+                        DmMessage("m2", DmRole.ASSISTANT, "bottom-visible-message", 101L, "n1", "bot"),
+                    ),
+                ),
+                streamingText = "",
+                onSend = { _, _ -> },
+                onPickImage = {},
+                onCancel = {},
+                pendingAttachments = listOf(
+                    PendingAttachment(
+                        mimeType = "application/pdf",
+                        displayName = "layout-proof.pdf",
+                        bytes = ByteArray(1),
+                        kind = Kind.FILE,
+                        sizeBytes = 1L,
+                    ),
+                ),
+            )
+        }
+        composeRule.waitForIdle()
+
+        val lastMessage = composeRule.onNodeWithText("bottom-visible-message").fetchSemanticsNode().boundsInRoot
+        val inputTop = composeRule.onNodeWithText("layout-proof.pdf").fetchSemanticsNode().boundsInRoot.top
+
+        check(lastMessage.bottom <= inputTop)
+    }
+
+    @Test
     fun chatScreen_shows_typing_fallback_when_streaming_without_text() {
         composeRule.setContent {
             ChatScreen(

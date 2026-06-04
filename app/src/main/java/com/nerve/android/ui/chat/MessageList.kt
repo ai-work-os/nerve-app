@@ -44,6 +44,7 @@ fun MessageList(
     onOpenDm: ((String, String, String) -> Unit)? = null,
     failedMessageIds: Set<String> = emptySet(),
     onRetry: (String) -> Unit = {},
+    contentPadding: PaddingValues = PaddingValues(),
 ) {
     val visibleMessages = remember(messages) {
         messages.filter { it.textContent.isNotBlank() || it.blocks.isNotEmpty() }
@@ -87,6 +88,7 @@ fun MessageList(
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         state = listState,
+        contentPadding = contentPadding,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         if (visibleMessages.isEmpty() && !isStreaming) {

@@ -28,6 +28,7 @@ fun ChatInputBar(
     canSend: Boolean,
     isSending: Boolean,
     isStreaming: Boolean = false,
+    modifier: Modifier = Modifier,
     onSend: (String, List<PendingAttachment>) -> Unit,
     onPickImage: () -> Unit,
     onPickFile: () -> Unit = {},
@@ -52,7 +53,7 @@ fun ChatInputBar(
     }
 
     Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (pendingAttachments.isNotEmpty()) {
