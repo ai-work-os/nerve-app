@@ -12,9 +12,9 @@ data class MorningBriefPresentation(
 ) {
     companion object {
         fun from(brief: MorningBrief?, loading: Boolean, error: String?): MorningBriefPresentation {
-            val cleanSections = brief?.sections.orEmpty().map { section ->
-                section.copy(items = section.items.map(::cleanItem).filter { it.isNotBlank() })
-            }
+            val cleanSections = mergeSections(
+                brief?.sections.orEmpty() + sourceDiagnosticSection(brief?.sources.orEmpty()),
+            )
             val summary = brief?.notificationBody
                 ?.let(::cleanItem)
                 ?.let { it.takeWithEllipsis(90) }
@@ -26,6 +26,33 @@ data class MorningBriefPresentation(
                 summary = summary,
                 sections = cleanSections,
                 statusMessage = friendlyStatus(loading, error),
+            )
+        }
+
+        private fun mergeSections(sections: List<MorningBriefSection>): List<MorningBriefSection> {
+            val byTitle = linkedMapOf<String, MutableList<String>>()
+            for (section in sections) {
+                val title = section.title.trim()
+                if (title.isBlank()) continue
+                val items = byTitle.getOrPut(title) { mutableListOf() }
+                for (item in section.items.map(::cleanItem).filter { it.isNotBlank() }) {
+                    if (!items.contains(item)) items += item
+                }
+            }
+            return byTitle.map { (title, items) -> MorningBriefSection(title = title, items = items) }
+        }
+
+        private fun sourceDiagnosticSection(sources: List<MorningBriefSource>): List<MorningBriefSection> {
+            if (sources.isEmpty()) return emptyList()
+            return listOf(
+                MorningBriefSection(
+                    title = "数据源状态",
+                    items = sources.map { source ->
+                        val status = if (source.available) "ok" else "missing"
+                        val count = source.count?.let { " ($it)" }.orEmpty()
+                        "${source.kind} $status: ${source.path}$count"
+                    },
+                ),
             )
         }
 
